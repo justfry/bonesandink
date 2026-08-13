@@ -156,6 +156,26 @@ const ATTRIBUTE_DICE: Die[] = [4, 6, 8, 10, 12];
 const RANKS: Rank[] = ["Новичок", "Закалённый", "Ветеран", "Герой", "Легенда"];
 const LIBRARY_STORAGE_KEY = "ultima-forsan-heroes-v2";
 const LEGACY_STORAGE_KEY = "ultima-forsan-character-v1";
+const SWADE_ADAPTATIONS = [
+  ["Маскировка", "Скрытность"],
+  ["Лазание · Метание · Плавание", "Атлетика"],
+  ["Выслеживание", "Выживание"],
+  ["Расследование", "Поиск информации"],
+  ["Уличное чутьё (навык)", "«Уличное чутьё»; при требовании — черта"],
+  ["Знание (военное дело)", "Военное дело"],
+  ["Харизма", "Убеждение / Выступление по ситуации"],
+] as const;
+const LEGACY_SKILL_TARGETS = new Map([
+  ["маскировка", "stealth"],
+  ["лазание", "athletics"],
+  ["метание", "athletics"],
+  ["плавание", "athletics"],
+  ["выслеживание", "survival"],
+  ["расследование", "research"],
+  ["анализ текста", "research"],
+  ["знание (военное дело)", "battle"],
+  ["уличное чутьё", "common"],
+]);
 
 const ARCHETYPES = [
   "Алхимик",
@@ -248,7 +268,7 @@ const EQUIPMENT_GUIDES: EquipmentGuide[] = [
   { id: "buckler", name: "Малый щит (баклер)", category: "Щит", parry: 1, price: 25, weight: 4, detail: "Защита +1 от фронтальных атак и атак слева." },
   { id: "medium-shield", name: "Средний щит", category: "Щит", parry: 1, price: 50, weight: 6, detail: "Защита +1; броня +2 против дистанционных атак." },
   { id: "large-shield", name: "Большой щит (ростовой)", category: "Щит", parry: 2, price: 200, weight: 10, detail: "Защита +2; броня +2 против дистанционных атак." },
-  { id: "plague-mask", name: "Маска чумного доктора", category: "Инструмент", price: 10, weight: 0, detail: "+1 к Выносливости против миазм, -1 к социальному впечатлению." },
+  { id: "plague-mask", name: "Маска чумного доктора", category: "Инструмент", price: 10, weight: 0, detail: "+1 к Выносливости против миазм; −1 к Убеждению и Выступлению, когда внешний вид имеет значение." },
   { id: "alchemist-bag", name: "Сумка алхимика", category: "Инструмент", price: 300, weight: 3, detail: "Инструменты для изготовления алхимических препаратов." },
   { id: "witch-bag", name: "Сумка ведьмы", category: "Инструмент", price: 150, weight: 2, detail: "Компоненты и предметы для ведьмовских фокусов." },
   { id: "lockpicks", name: "Отмычки", category: "Инструмент", price: 200, weight: 0.5, detail: "Набор для вскрытия замков." },
@@ -288,13 +308,13 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Обаяние", requirements: "Новичок, Характер d8+", detail: "Бесплатный переброс проверок Убеждения.", source: "SWADE" },
   { name: "Полиглот", requirements: "Новичок, Смекалка d6+", detail: "Даёт несколько языков на уровне d6 по Смекалке персонажа.", source: "SWADE" },
   { name: "Привлекательность", requirements: "Новичок, Выносливость d6+", detail: "+1 к Выступлению и Убеждению, когда внешность имеет значение.", source: "SWADE" },
-  { name: "Силач", requirements: "Новичок, Сила d6+, Выносливость d6+", detail: "Связывает Атлетику с Силой и увеличивает дальность метания.", source: "SWADE" },
+  { name: "Силач", requirements: "Новичок, Сила d6+, Выносливость d6+", detail: "Связывает Атлетику с Силой и на 1 увеличивает дистанцию Атлетики (метание).", source: "SWADE" },
   { name: "Слава", requirements: "Новичок", detail: "+1 к Убеждению, если героя узнали; выступления оплачиваются лучше.", source: "SWADE" },
   { name: "Смелость", requirements: "Новичок, Характер d6+", detail: "+2 к сопротивлению страху и -2 к броскам по таблице ужаса.", source: "SWADE" },
   { name: "Стремительность", requirements: "Новичок, Ловкость d8+", detail: "Позволяет перетянуть низкую карту действия.", source: "SWADE" },
   { name: "Упорство", requirements: "Новичок, Характер d8+", detail: "+2 к результату проверки параметра, переброшенной за фишку.", source: "SWADE" },
   { name: "Беглый огонь", requirements: "Закалённый, Стрельба d6+", detail: "Для одной дистанционной атаки в ход Скорострельность оружия увеличивается на 1.", source: "SWADE" },
-  { name: "Беспощадность", requirements: "Закалённый", detail: "+2 к урону, если потратить фишку на его переброс.", source: "SWADE", caution: "В книге Ultima Forsan эта черта указана как недоступная; для кампании согласуйте с ведущим." },
+  { name: "Беспощадность", requirements: "Закалённый", detail: "+2 к урону, если потратить фишку на его переброс.", source: "SWADE", caution: "Недоступна в Ultima Forsan." },
   { name: "Блок", requirements: "Закалённый, Драка d8+", detail: "+1 к Защите и ослабляет бонус врагов за объединение сил.", source: "SWADE" },
   { name: "Боевая закалка", requirements: "Закалённый", detail: "+2 к попыткам выйти из шока и оправиться от оглушения.", source: "SWADE" },
   { name: "Боевая ярость", requirements: "Закалённый, Драка d8+", detail: "Исключительным действием добавляет вторую кость Драки к одной атаке в ход.", source: "SWADE" },
@@ -334,7 +354,7 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Целитель", requirements: "Новичок, Характер d8+", detail: "+2 к обычным и мистическим проверкам Лечения.", source: "SWADE" },
   { name: "Шестое чувство", requirements: "Новичок", detail: "+2 к Вниманию для обнаружения засад и подобных опасностей.", source: "SWADE" },
   { name: "Акробат", requirements: "Новичок, Ловкость d8+, Атлетика d8+", detail: "Бесплатный переброс Атлетики при акробатических действиях.", source: "SWADE" },
-  { name: "Вор", requirements: "Новичок, Ловкость d8+, Скрытность d6+, Воровство d6+", detail: "+1 к Воровству, лазанию и Скрытности в городе.", source: "SWADE" },
+  { name: "Вор", requirements: "Новичок, Ловкость d8+, Скрытность d6+, Воровство d6+", detail: "+1 к Воровству, Атлетике (лазание) и Скрытности в городе.", source: "SWADE" },
   { name: "Егерь", requirements: "Новичок, Характер d6+, Выживание d8+", detail: "+2 к Выживанию и Скрытности в дикой местности.", source: "SWADE" },
   { name: "Золотые руки", requirements: "Новичок, Ремонт d8+", detail: "+2 к Ремонту; с подъёмом работа занимает вдвое меньше времени.", source: "SWADE" },
   { name: "Мастер на все руки", requirements: "Новичок, Смекалка d10+", detail: "Проверка Смекалки временно даёт незнакомый навык d4 или d6.", source: "SWADE" },
@@ -353,7 +373,7 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Полезные связи", requirements: "Новичок", detail: "Раз за встречу знакомые помогают или дают информацию.", source: "SWADE" },
   { name: "Провокация", requirements: "Новичок, Насмешка d6+", detail: "Подъём в Насмешке заставляет противника сосредоточиться на герое.", source: "SWADE" },
   { name: "Смутьян", requirements: "Закалённый, Характер d8+", detail: "Одна уловка Запугиванием или Насмешкой действует по области.", source: "SWADE" },
-  { name: "Уличное чутьё", requirements: "Новичок, Смекалка d6+", detail: "+2 к Осведомлённости и связям в преступной среде.", source: "SWADE" },
+  { name: "Уличное чутьё", requirements: "Новичок, Смекалка d6+", detail: "+2 к Осведомлённости о преступном мире и к Убеждению или Запугиванию при социальных связях с криминалитетом.", source: "SWADE" },
   { name: "Верные спутники", requirements: "Легенда, дикая карта", detail: "У героя появляются пять верных спутников.", source: "SWADE" },
   { name: "Искусный воин", requirements: "Легенда, Драка d12+", detail: "+1 к Защите; дополнительная кость урона Дракой становится d8.", source: "SWADE" },
   { name: "Несгибаемый", requirements: "Легенда, Выносливость d8+", detail: "Герой выдерживает четвёртое ранение перед состоянием при смерти.", source: "SWADE" },
@@ -375,10 +395,10 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Могучий удар", requirements: "Новичок, дикая карта, Драка d8+", detail: "С джокером первая успешная атака Дракой наносит двойной урон.", source: "SWADE" },
   { name: "Разрыв дистанции+", requirements: "Закалённый, Разрыв дистанции", detail: "До трёх противников не получают свободную атаку, когда герой выходит из ближнего боя.", source: "SWADE" },
   { name: "Рок-н-ролл!", requirements: "Закалённый, Стрельба d8+", detail: "Игнорирует штрафы за отдачу оружия со Скорострельностью 2+, если стрелок не двигался.", source: "SWADE", caution: "Автоматическое оружие не соответствует обычной кампании Ultima Forsan; черта приведена для полноты справочника." },
-  { name: "Смертельный выстрел", requirements: "Новичок, дикая карта, Атлетика или Стрельба d8+", detail: "С джокером первая успешная атака метанием или Стрельбой наносит двойной урон.", source: "SWADE" },
+  { name: "Смертельный выстрел", requirements: "Новичок, дикая карта, Атлетика или Стрельба d8+", detail: "С джокером первая успешная атака Атлетикой (метание) или Стрельбой наносит двойной урон.", source: "SWADE" },
   { name: "Стальные нервы+", requirements: "Новичок, Стальные нервы", detail: "Герой игнорирует до 2 пунктов штрафа за ранения.", source: "SWADE" },
   { name: "Тяжеловес+", requirements: "Закалённый, Тяжеловес", detail: "+2 к Стойкости; дополнительная кость безоружного урона увеличивается на ступень.", source: "SWADE" },
-  { name: "Убийца великанов", requirements: "Ветеран", detail: "+1d6 к урону по существу, которое больше героя как минимум на 3 пункта Размера.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; согласуйте её с ведущим." },
+  { name: "Убийца великанов", requirements: "Ветеран", detail: "+1d6 к урону по существу, которое больше героя как минимум на 3 пункта Размера.", source: "SWADE", caution: "Недоступна в Ultima Forsan." },
   { name: "Увёртливость+", requirements: "Закалённый, Увёртливость", detail: "+2 к проверкам уклонения.", source: "SWADE" },
   { name: "Упреждающий удар+", requirements: "Герой, Упреждающий удар", detail: "Позволяет применять Упреждающий удар по нескольким подходящим целям за раунд.", source: "SWADE" },
   { name: "Хладнокровие+", requirements: "Закалённый, Хладнокровие", detail: "Герой тянет три карты действия и выбирает лучшую.", source: "SWADE" },
@@ -410,6 +430,7 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Ци", requirements: "Ветеран, Мастер боевых искусств+", detail: "Раз за бой позволяет перебросить атаку, заставить врага перебросить удачную атаку или добавить d6 к безоружной Драке.", source: "SWADE" },
   { name: "Мистический дар (алхимия)", requirements: "Новичок", detail: "Открывает алхимию и сверхъестественный навык Алхимия.", source: "Ultima Forsan" },
   { name: "Мистический дар (ведьмовство)", requirements: "Новичок", detail: "Открывает ведьмовство и сверхъестественный навык Ведьмовство.", source: "Ultima Forsan" },
+  { name: "Мистический дар (безумная наука)", requirements: "Новичок", detail: "Открывает Безумную науку d4, 2 начальные силы и 15 ПС; силы проявляются через устройства.", source: "Ultima Forsan" },
   { name: "Аль-барсарк", requirements: "Новичок, обычно сицилийский норманн, Сила d8+, Характер d6+", detail: "Священная ярость против чумных отродий усиливает ближний бой и Стойкость, но снижает Защиту.", source: "Ultima Forsan" },
   { name: "Выстрел в голову", requirements: "Новичок, Стрельба d8+, Твёрдая рука", detail: "Вдвое уменьшает штраф за прицельный выстрел в голову мертвецу.", source: "Ultima Forsan" },
   { name: "Удар в голову", requirements: "Новичок, Сила d6+, Драка d8+, Хладнокровие", detail: "Вдвое уменьшает штраф за прицельный удар в голову мертвеца.", source: "Ultima Forsan" },
@@ -420,12 +441,12 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Путь Лимба", requirements: "Герой, Путь Ада, Путь Небес, Путь Чистилища, Ловкость d8+, Характер d10+", detail: "Позволяет становиться незаметным для слабейших мертвецов, пока герой не бежит и не действует активно.", source: "Ultima Forsan" },
   { name: "Всадник", requirements: "Новичок, Ловкость d6+, Верховая езда d8+", detail: "+2 к Верховой езде и ловкостным уловкам верхом без штрафа за нагрузку.", source: "Ultima Forsan" },
   { name: "Брат милосердия / сестра чёток", requirements: "Новичок, Характер d6+, Драка d6+", detail: "Даёт Мастера боевых искусств, особое оружие, броню и приют; налагает крупный Пацифизм.", source: "Ultima Forsan" },
-  { name: "Искариот", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d8+, Маскировка d8+", detail: "Мастер двух кинжалов; использует Ловкость для урона и получает фирменное снаряжение.", source: "Ultima Forsan", caution: "Навык Маскировка взят из старой редакции; в SWADE согласуйте замену со ведущим." },
-  { name: "Красная одалиска", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d6+, Убеждение d6+, Привлекательность", detail: "Сражается двумя саблями и использует Ловкость для урона без штрафа за нагрузку.", source: "Ultima Forsan" },
+  { name: "Искариот", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d8+, Скрытность d8+", detail: "Мастер двух кинжалов; использует Ловкость для урона и получает фирменное снаряжение.", source: "Ultima Forsan", caution: "Адаптация SWADE: требование «Маскировка d8+» заменено на «Скрытность d8+»." },
+  { name: "Красная одалиска", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d6+, Убеждение d6+, Привлекательность", detail: "Сражается двумя саблями и использует Ловкость для урона без штрафа за нагрузку; красная вуаль даёт +1 к Убеждению и Выступлению, когда важен статус.", source: "Ultima Forsan", caution: "Адаптация SWADE: старый бонус +1 к Харизме действует как ситуативный +1 к Убеждению и Выступлению." },
   { name: "Ловец мертвецов", requirements: "Новичок, Ловкость d6+, Знание (Чума) d4+", detail: "Снаряжение ловца; без штрафа против мелких целей и +2 против стай и роёв.", source: "Ultima Forsan" },
-  { name: "Могильщик", requirements: "Новичок, Сила d6+, Знание (Чума) d4+", detail: "Стартовое снаряжение, +2 к Знанию (Чума), поиску Чернил и распознаванию заражения.", source: "Ultima Forsan" },
+  { name: "Могильщик", requirements: "Новичок, Сила d6+, Знание (Чума) d4+", detail: "Стартовое снаряжение; +2 к Знанию (Чума) и Вниманию при поиске Чернил или признаков заражения.", source: "Ultima Forsan" },
   { name: "Рыцарь", requirements: "Новичок, Сила d8+, Характер d6+, Выносливость d6+, Верховая езда d8+, Драка d8+", detail: "Обет службы, полное рыцарское снаряжение и приют; специализация зависит от ордена.", source: "Ultima Forsan" },
-  { name: "Тевтонский инквизитор", requirements: "Новичок, Смекалка d6+, Знание (Чума) d6+, Внимание d6+ и навыки расследования", detail: "Даёт Следователя, пистоль и полномочия ордена; требует подчинения начальству.", source: "Ultima Forsan", caution: "Часть требований названа по старой редакции; согласуйте эквиваленты SWADE." },
+  { name: "Тевтонский инквизитор", requirements: "Новичок, Смекалка d6+, Уличное чутьё, Знание (Чума) d6+, Поиск информации d6+, Внимание d6+", detail: "Бесплатно даёт черту «Сыщик», пистоль и полномочия ордена; требует подчинения начальству.", source: "Ultima Forsan", caution: "Адаптация SWADE: старые навыки «Уличное чутьё» и «Расследование» заменены на черту «Уличное чутьё» и навык «Поиск информации». «Следователь» переименован в «Сыщика»." },
   { name: "Чумный доктор", requirements: "Новичок, Знание (Чума) d6+, Лечение d6+", detail: "+2 к Знанию (Чума), медицинское снаряжение и возможность быстро удалить заражённую ткань.", source: "Ultima Forsan" },
   { name: "Механический протез", requirements: "Новичок, дикая карта, отсутствует часть тела", detail: "Протез отменяет изъян, вызванный утратой соответствующей части тела.", source: "Ultima Forsan" },
   { name: "Отвлечь мертвеца", requirements: "Новичок, нечистый, Смекалка d6+, Характер d8+", detail: "Встречной проверкой Характера вводит некоторых мертвецов в шок и может отвести их.", source: "Ultima Forsan" },
@@ -436,8 +457,26 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Скверна", requirements: "Герой, человек, Выносливость d8+", detail: "После мучительной болезни герой превращается в нечистого и получает все его особенности.", source: "Ultima Forsan" },
   { name: "За гранью", requirements: "Легенда, дикая карта, нечистый, Характер d12+", detail: "Нечистый превращается в разумную стрыгу и получает особенности мертвеца без потери разума.", source: "Ultima Forsan" },
   { name: "Судный день", requirements: "Легенда, Именное оружие, Драка d10+ или Атлетика d10+ или Стрельба d10+", detail: "Именное оружие становится священным и наносит мертвецам дополнительную кость урона.", source: "Ultima Forsan" },
-  { name: "Усовершенствованное устройство", requirements: "Легенда, Мистический дар (безумная наука), Безумная наука d10+", detail: "Одна сила устройства становится надёжнее, легче поддерживается и реже вызывает отдачу.", source: "Ultima Forsan", caution: "Безумная наука из старой редакции адаптируется в кампании; согласуйте механику с ведущим." },
+  { name: "Усовершенствованное устройство", requirements: "Легенда, Мистический дар (безумная наука), Безумная наука d10+", detail: "Выберите одну силу устройства: +1 к её активации, а каждое продление не требует обычного 1 ПС.", source: "Ultima Forsan", caution: "Адаптация SWADE: старые пункты о штрафе за несколько активных сил, ранении/шоке и обычной отдаче убраны — в SWADE таких ограничений нет, а силы прекращаются при критическом провале." },
 ];
+
+const CAMPAIGN_UNAVAILABLE_EDGE_NAMES = new Set([
+  "Беспощадность",
+  "Воин света / тьмы",
+  "Восстановление силы",
+  "Восстановление силы+",
+  "Избранный",
+  "Изобретатель",
+  "Иссушение духа",
+  "Менталист",
+  "Прилив силы",
+  "Пункты силы",
+  "Рок-н-ролл!",
+  "Убийца великанов",
+  "Устойчивость к мистическим силам",
+  "Устойчивость к мистическим силам+",
+  "Чародей",
+]);
 
 const HINDRANCE_GUIDES: TraitGuide[] = [
   { name: "Болезненность", severity: "minor", detail: "-2 к Выносливости при сопротивлении Усталости.", source: "SWADE" },
@@ -468,7 +507,7 @@ const HINDRANCE_GUIDES: TraitGuide[] = [
   { name: "Неграмотность", severity: "minor", detail: "Не умеет читать и писать.", source: "SWADE", caution: "В Ultima Forsan герои по умолчанию грамотны; этот изъян отменяет правило мира." },
   { name: "Немота", severity: "major", detail: "Не способен разговаривать.", source: "SWADE" },
   { name: "Неуклюжесть", severity: "major", detail: "-2 к Атлетике и Скрытности.", source: "SWADE" },
-  { name: "Неумение плавать", severity: "minor", detail: "-2 к плаванию; движение в воде стоит втрое дороже.", source: "SWADE" },
+  { name: "Неумение плавать", severity: "minor", detail: "−2 к Атлетике (плавание); каждая клетка в воде стоит 3 клетки движения.", source: "SWADE" },
   { name: "Обидчивость", severity: "either", detail: "Хуже сопротивляется Насмешкам: -2 или -4 по тяжести.", source: "SWADE" },
   { name: "Обязательства", severity: "either", detail: "Должен посвящать обязанностям значительную часть недели.", source: "SWADE" },
   { name: "Одержимость идеей", severity: "either", detail: "Подчиняет решения великой цели; крупная версия почти всепоглощающая.", source: "SWADE" },
@@ -497,7 +536,7 @@ const HINDRANCE_GUIDES: TraitGuide[] = [
   { name: "Хромота", severity: "either", detail: "Снижает Шаг и бег; крупная версия также даёт -2 к Атлетике.", source: "SWADE" },
   { name: "Чужак", severity: "either", detail: "-2 к Убеждению; при крупной версии нет гражданских прав.", source: "SWADE" },
   { name: "Юность", severity: "either", detail: "Меньше пунктов характеристик и навыков, но больше фишек.", source: "SWADE" },
-  { name: "Слабое нутро", severity: "major", detail: "При каждом столкновении с ужасами Чумы проходит проверку храбрости.", source: "Ultima Forsan" },
+  { name: "Слабое нутро", severity: "major", detail: "При каждом столкновении с ужасами Чумы проходит проверку Храбрости (Характера).", source: "Ultima Forsan" },
 ];
 
 function requiredRank(guide: TraitGuide): Rank {
@@ -517,6 +556,16 @@ function rankAllows(currentRank: string, guide: TraitGuide) {
   return current >= RANKS.indexOf(requiredRank(guide));
 }
 
+function edgeAvailableInCampaign(guide: TraitGuide) {
+  return !CAMPAIGN_UNAVAILABLE_EDGE_NAMES.has(guide.name);
+}
+
+function campaignEdgeIssue(guide: TraitGuide) {
+  if (!edgeAvailableInCampaign(guide)) return "Черта недоступна в кампании Ultima Forsan";
+  if (guide.name === "Сардоническая усмешка") return "Черта выдаётся только после заражения в игре";
+  return "";
+}
+
 const ATTRIBUTE_REQUIREMENTS: Record<string, AttributeKey> = {
   "ловкость": "agility",
   "смекалка": "smarts",
@@ -529,6 +578,8 @@ function edgeRequirementIssues(guide: TraitGuide, rank: Rank, character: Charact
   const requirements = guide.requirements || "";
   const normalized = requirements.toLocaleLowerCase("ru");
   const issues: string[] = [];
+  const campaignIssue = campaignEdgeIssue(guide);
+  if (campaignIssue) issues.push(campaignIssue);
   if (!rankAllows(rank, guide)) issues.push(`Нужен ранг «${requiredRank(guide)}»`);
 
   for (const match of normalized.matchAll(/(ловкость|смекалка|характер|сила|выносливость) d(4|6|8|10|12)\+/g)) {
@@ -538,9 +589,11 @@ function edgeRequirementIssues(guide: TraitGuide, rank: Rank, character: Charact
   }
 
   const skillByName = new Map(skills.map((skill) => [skill.name.toLocaleLowerCase("ru"), skill]));
+  const alternativeRequirementSegments = new Set<string>();
   for (const segment of requirements.split(",").map((item) => item.trim())) {
     const lowerSegment = segment.toLocaleLowerCase("ru");
     if (lowerSegment.includes(" или ")) {
+      alternativeRequirementSegments.add(lowerSegment);
       const defaultDie = Number(lowerSegment.match(/d(4|6|8|10|12)\+/)?.[1] || 0);
       const options = lowerSegment.split(/\s+или\s+/).map((option) => {
         const needed = Number(option.match(/d(4|6|8|10|12)\+/)?.[1] || defaultDie);
@@ -563,6 +616,7 @@ function edgeRequirementIssues(guide: TraitGuide, rank: Rank, character: Charact
   const segments = requirements.split(",").map((segment) => segment.trim()).slice(1);
   for (const segment of segments) {
     const lower = segment.toLocaleLowerCase("ru");
+    if (alternativeRequirementSegments.has(lower)) continue;
     if (/d(4|6|8|10|12)\+/.test(lower) || lower.includes("или") || lower.includes("дикая карта") || lower.includes("человек") || lower.includes("нечист") || lower.includes("см. описание") || lower.includes("отсутствует") || lower.includes("навык") || lower.includes("параметр") || lower.includes("сицилий")) continue;
     if (lower === "мистический дар") {
       if (!owned.some((name) => name.startsWith("мистический дар"))) issues.push("Нужна черта «Мистический дар»");
@@ -589,6 +643,7 @@ const BASE_SKILLS: Omit<Skill, "level">[] = [
   { id: "persuasion", name: "Убеждение", attribute: "spirit", core: true },
   { id: "academics", name: "Академические знания", attribute: "smarts" },
   { id: "alchemy", name: "Алхимия", attribute: "smarts" },
+  { id: "weird-science", name: "Безумная наука", attribute: "smarts" },
   { id: "riding", name: "Верховая езда", attribute: "agility" },
   { id: "faith", name: "Вера", attribute: "spirit" },
   { id: "battle", name: "Военное дело", attribute: "smarts" },
@@ -695,6 +750,11 @@ function restoreCharacter(value?: Partial<Character>): Character {
   delete rest.rank;
   delete rest.rulesMode;
   delete rest.charisma;
+  const restoredEdges = rest.edges?.map((entry) => (
+    entry.name.trim().toLocaleLowerCase("ru") === "следователь"
+      ? { ...entry, name: "Сыщик", note: "+2 к Поиску информации и Вниманию при поиске улик." }
+      : entry
+  ));
   return {
     ...initial,
     ...rest,
@@ -708,10 +768,10 @@ function restoreCharacter(value?: Partial<Character>): Character {
     portraitY: Math.min(100, Math.max(0, safeNumber(rest.portraitY, 50))),
     portraitZoom: Math.min(180, Math.max(100, safeNumber(rest.portraitZoom, 100))),
     ammoSpent: rest.ammoSpent && typeof rest.ammoSpent === "object" ? rest.ammoSpent : {},
-    edges: rest.edges?.length
+    edges: restoredEdges?.length
       ? [
-          ...rest.edges.filter((entry) => entry.name.trim() || entry.note.trim()),
-          ...(rest.edges.some((entry) => !entry.name.trim() && !entry.note.trim()) ? [blankEdge()] : []),
+          ...restoredEdges.filter((entry) => entry.name.trim() || entry.note.trim()),
+          ...(restoredEdges.some((entry) => !entry.name.trim() && !entry.note.trim()) ? [blankEdge()] : []),
         ]
       : initial.edges,
     hindrances: rest.hindrances?.length ? rest.hindrances : initial.hindrances,
@@ -722,12 +782,22 @@ function restoreCharacter(value?: Partial<Character>): Character {
 function restoreSkills(value?: Skill[]): Skill[] {
   if (!value?.length) return createInitialSkills();
   const savedById = new Map(value.map((skill) => [skill.id, skill]));
-  const standard = createInitialSkills().map((skill) => ({
-    ...skill,
-    ...(savedById.get(skill.id) || {}),
-    core: skill.core,
-  }));
-  const custom = value.filter((skill) => skill.id.startsWith("custom-"));
+  const migratedLevels = new Map<string, Die>();
+  for (const skill of value) {
+    const targetId = LEGACY_SKILL_TARGETS.get(skill.name.trim().toLocaleLowerCase("ru"));
+    if (targetId) migratedLevels.set(targetId, Math.max(migratedLevels.get(targetId) || 0, skill.level) as Die);
+  }
+  const standard = createInitialSkills().map((skill) => {
+    const saved = savedById.get(skill.id);
+    const migratedLevel = migratedLevels.get(skill.id) || 0;
+    return {
+      ...skill,
+      ...(saved || {}),
+      level: Math.max(saved?.level || 0, migratedLevel, skill.core ? 4 : 0) as Die,
+      core: skill.core,
+    };
+  });
+  const custom = value.filter((skill) => skill.id.startsWith("custom-") && !LEGACY_SKILL_TARGETS.has(skill.name.trim().toLocaleLowerCase("ru")));
   return [...standard, ...custom];
 }
 
@@ -1106,14 +1176,16 @@ function TraitGuideInput({
           </div>
           {suggestions.map((guide) => {
             const unavailable = kind === "edge" && !rankAllows(rank, guide);
+            const campaignUnavailable = kind === "edge" && Boolean(campaignEdgeIssue(guide));
             const issues = requirementIssues?.(guide) || [];
-            const blocked = disableFutureRank && (unavailable || issues.length > 0);
+            const blocked = campaignUnavailable || (disableFutureRank && (unavailable || issues.length > 0));
             return (
-            <button className={unavailable || issues.length ? "future-rank" : ""} disabled={blocked} key={guide.name} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(guide)}>
+            <button className={unavailable || campaignUnavailable || issues.length ? "future-rank" : ""} disabled={blocked} key={guide.name} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(guide)}>
               <span>
                 <strong>{guide.name}</strong>
                 <em>{guide.source}</em>
                 {unavailable && <i>с ранга «{requiredRank(guide)}»</i>}
+                {campaignUnavailable && <i>недоступна в кампании</i>}
               </span>
               <small>{guide.requirements || (guide.severity === "major" ? "Крупный" : guide.severity === "minor" ? "Мелкий" : "Мелкий или крупный")}</small>
               <p>{guide.detail}</p>
@@ -1447,7 +1519,7 @@ export default function Home() {
   const currentRank = rankFromAdvances(advances);
   const nextRankThreshold = nextRankAt(currentRank);
   const edgeAdvances = Math.min(advances, Math.max(0, safeNumber(character.edgeAdvances)));
-  const baseEdgeSlots = character.purity === "Чистый" ? 1 : 0;
+  const baseEdgeSlots = 1;
   const edgeLimit = baseEdgeSlots + hindranceEdgeSlots + edgeAdvances;
   const chosenEdgeCount = character.edges.filter((item) => item.name.trim()).length;
   const addableEdgeRows = Math.max(0, edgeLimit - character.edges.length);
@@ -1470,7 +1542,7 @@ export default function Home() {
   const printSkills = skills.filter((skill) => skill.level > 0).slice(0, 24);
   const playSkills = skills.filter((skill) => skill.level > 0);
   const playWeapons = character.weapons.filter((weapon) => weapon.name.trim());
-  const availableEdgeCount = EDGE_GUIDES.filter((guide) => rankAllows(currentRank, guide)).length;
+  const availableEdgeCount = EDGE_GUIDES.filter((guide) => rankAllows(currentRank, guide) && edgeAvailableInCampaign(guide)).length;
   const creationReady = creationAttributePoints <= 5 && creationSkillPoints <= skillBudget && chosenEdgeCount <= edgeLimit;
 
   const completion = [
@@ -1926,9 +1998,18 @@ export default function Home() {
                 <span>12 пунктов навыков · 5 базовых навыков d4 · особенности Ultima Forsan адаптированы</span>
               </div>
               <p className="rules-note">
-                Генератор использует базовую механику SWADE. Если правило из книги сеттинга написано
-                для предыдущей редакции, подсказка отмечает адаптацию или необходимость решения ведущего.
+                Генератор использует базовую механику SWADE. Термины и требования из книги сеттинга
+                автоматически переведены с предыдущей редакции; недоступные в кампании черты выбрать нельзя.
               </p>
+              <details className="adaptation-guide">
+                <summary>Что изменено при переводе на SWADE</summary>
+                <div>
+                  {SWADE_ADAPTATIONS.map(([oldTerm, newTerm]) => (
+                    <span key={oldTerm}><s>{oldTerm}</s><i aria-hidden="true">→</i><b>{newTerm}</b></span>
+                  ))}
+                </div>
+                <p>Бонусы к старой Харизме применяются только там, где важны статус, внешность или наряд. Проверки Храбрости проходят Характером.</p>
+              </details>
               <div className="field-grid two">
                 <Field label="Имя героя" value={character.name} maxLength={48} onChange={(value) => update("name", value)} placeholder="Как его зовут?" />
                 <Field label="Имя игрока" value={character.player} maxLength={36} onChange={(value) => update("player", value)} />
@@ -1971,7 +2052,7 @@ export default function Home() {
               {character.purity === "Нечистый" && (
                 <div className="warning-box">
                   Нечистый невосприимчив к Чуме, заразен и обречён восстать после смерти.
-                  Повышение Выносливости стоит 2 пункта за ступень.
+                  Повышение Выносливости стоит 2 пункта за ступень. Как человек, он тоже получает 1 бесплатную черту.
                 </div>
               )}
               <TextAreaField
@@ -2137,7 +2218,7 @@ export default function Home() {
                   <div className="weapon-block" key={weapon.id}>
                     <div className="weapon-row">
                       <WeaponGuideInput weapon={weapon} onChange={(patch) => updateEntry<Weapon>("weapons", weapon.id, patch)} />
-                      {(["range", "damage", "ap", "ammo"] as (keyof Weapon)[]).map((key) => (
+                      {(["range", "damage", "ap", "ammo"] as const).map((key) => (
                         <input key={key} aria-label={`${key} оружия`} value={weapon[key]} onChange={(event) => updateEntry<Weapon>("weapons", weapon.id, { [key]: event.target.value })} />
                       ))}
                       <button className="remove" aria-label="Удалить оружие" onClick={() => removeEntry("weapons", weapon.id)}>×</button>
@@ -2299,7 +2380,7 @@ export default function Home() {
                     <div className="blood-stat">
                       <small>Кровь</small>
                       <b>{character.purity === "Нечистый" ? "Нечистая" : "Норма"}</b>
-                      <p>{character.purity === "Нечистый" ? "Иммунитет к Чуме · заразная кровь · восстанет после смерти" : "Обычный человек · 1 бесплатная черта при создании"}</p>
+                      <p>{character.purity === "Нечистый" ? "Иммунитет к Чуме · заразная кровь · 1 бесплатная черта" : "Обычный человек · 1 бесплатная черта при создании"}</p>
                     </div>
                   </div>
                   <div className="tracks">
