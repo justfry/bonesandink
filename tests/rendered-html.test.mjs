@@ -95,6 +95,12 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /creationLocked/);
   assert.match(page, /Зафиксировать героя/);
   assert.ok(page.indexOf("Зафиксировать героя") > page.indexOf('className="form-footer"'));
+  assert.match(page, /className="play-dashboard"/);
+  assert.match(page, /"play-workspace"/);
+  assert.match(page, /const playSkills = skills\.filter\(\(skill\) => skill\.level > 0\)/);
+  assert.match(page, /Только изученные/);
+  assert.match(page, /Изменить досье/);
+  assert.match(page, /Управлять снаряжением/);
   assert.match(page, /Состояние в игре/);
   assert.match(page, /Потраченный боезапас/);
   assert.match(page, /Настройки PDF/);
@@ -127,6 +133,8 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.hero-import-input/);
   assert.match(css, /\.equipment-catalog/);
   assert.match(css, /\.creation-lock/);
+  assert.match(css, /\.play-dashboard/);
+  assert.match(css, /\.play-skills-grid/);
   assert.match(css, /\.state-grid/);
   assert.match(css, /\.notes-page/);
   assert.doesNotMatch(page, /_sites-preview|react-loading-skeleton|codex-preview/);

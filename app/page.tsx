@@ -1148,6 +1148,7 @@ export default function Home() {
   const [activeHeroId, setActiveHeroId] = useState("");
   const [savedAt, setSavedAt] = useState("");
   const [mobileView, setMobileView] = useState<"form" | "preview">("form");
+  const [editingLockedHero, setEditingLockedHero] = useState(false);
   const [printRequested, setPrintRequested] = useState(false);
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [advanceType, setAdvanceType] = useState<AdvanceType>("edge");
@@ -1348,6 +1349,7 @@ export default function Home() {
     if (!creationReady) return window.alert("Сначала исправьте превышение пунктов характеристик, навыков или черт.");
     if (!window.confirm("Завершить создание? Характеристики, навыки, черты и изъяны дальше будут изменяться через повышения.")) return;
     update("creationLocked", true);
+    setEditingLockedHero(false);
   };
 
   const attributePoints = useMemo(
@@ -1402,6 +1404,8 @@ export default function Home() {
     .map((item) => item.trim())
     .filter(Boolean).length;
   const printSkills = skills.filter((skill) => skill.level > 0).slice(0, 24);
+  const playSkills = skills.filter((skill) => skill.level > 0);
+  const playWeapons = character.weapons.filter((weapon) => weapon.name.trim());
   const availableEdgeCount = EDGE_GUIDES.filter((guide) => rankAllows(currentRank, guide)).length;
   const creationReady = creationAttributePoints <= 5 && creationSkillPoints <= skillBudget && chosenEdgeCount <= edgeLimit;
 
@@ -1595,6 +1599,7 @@ export default function Home() {
     setCharacter(copyData(hero.character));
     setSkills(copyData(hero.skills));
     setAdvanceHistory(copyData(hero.advanceHistory));
+    setEditingLockedHero(false);
   };
 
   const createHero = () => {
@@ -1612,6 +1617,7 @@ export default function Home() {
     setCharacter(copyData(hero.character));
     setSkills(copyData(hero.skills));
     setAdvanceHistory([]);
+    setEditingLockedHero(false);
   };
 
   const duplicateHero = () => {
@@ -1631,6 +1637,7 @@ export default function Home() {
     setCharacter(copyData(hero.character));
     setSkills(copyData(hero.skills));
     setAdvanceHistory(copyData(hero.advanceHistory));
+    setEditingLockedHero(false);
   };
 
   const deleteHero = () => {
@@ -1645,6 +1652,7 @@ export default function Home() {
     setCharacter(copyData(nextActive.character));
     setSkills(copyData(nextActive.skills));
     setAdvanceHistory(copyData(nextActive.advanceHistory));
+    setEditingLockedHero(false);
   };
 
   const resetAll = () => {
@@ -1699,6 +1707,7 @@ export default function Home() {
       setCharacter(copyData(hero.character));
       setSkills(copyData(hero.skills));
       setAdvanceHistory(copyData(hero.advanceHistory));
+      setEditingLockedHero(false);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Не удалось импортировать героя.");
     } finally {
@@ -1722,7 +1731,7 @@ export default function Home() {
           <strong>{completion}/8</strong>
         </div>
         <div className="topbar-actions">
-          <button className="button ghost" onClick={fillDemo}>Заполнить пример</button>
+          {!character.creationLocked && <button className="button ghost" onClick={fillDemo}>Заполнить пример</button>}
           <button className="button primary" onClick={() => setPrintRequested(true)}>
             Сохранить PDF
           </button>
@@ -1766,8 +1775,76 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="workspace">
+      <div className={`workspace ${character.creationLocked && !editingLockedHero ? "play-workspace" : ""}`}>
         <section className={`form-panel ${mobileView === "form" ? "mobile-active" : ""}`}>
+          {character.creationLocked && !editingLockedHero && (
+            <div className="play-dashboard">
+              <header className="play-hero-header">
+                {character.portrait && <figure><img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt={`Портрет: ${character.name || "персонаж"}`} /></figure>}
+                <div className="play-hero-title">
+                  <span>Игровой режим · {currentRank}</span>
+                  <h2>{character.name || "Безымянный герой"}</h2>
+                  <p>{[character.archetype, character.origin].filter(Boolean).join(" · ") || "Досье зафиксировано"}</p>
+                </div>
+                <div className="play-actions">
+                  <button className="button primary" type="button" onClick={openAdvance}>+ Повышение</button>
+                  <button className="button play-button" type="button" onClick={() => setPrintRequested(true)}>PDF</button>
+                  <button className="button play-button" type="button" onClick={() => setEditingLockedHero(true)}>Изменить досье</button>
+                </div>
+              </header>
+
+              <section className="play-card play-vitals">
+                <div className="play-card-title"><span>Главное</span><small>{advances} повышений</small></div>
+                <div className="play-derived-grid">
+                  <div><span>Защита</span><strong>{parry}</strong></div>
+                  <div><span>Стойкость</span><strong>{toughness}</strong><small>броня {effectiveArmor}</small></div>
+                  <div><span>Шаг</span><strong>{encumbered ? Math.max(0, character.pace - 2) : character.pace}</strong>{encumbered && <small>перегрузка</small>}</div>
+                  <div><span>Бег</span><strong>{dieLabel(character.runningDie)}</strong></div>
+                  <div><span>Фишки</span><strong>{character.sessionBennies}</strong><small>из {character.bennies}</small></div>
+                </div>
+                <div className="play-attributes">
+                  {ATTRIBUTE_META.map(({ key, label, abbr }) => <div key={key}><span>{abbr}</span><b>{label}</b><strong>{dieLabel(character.attributes[key])}</strong></div>)}
+                </div>
+              </section>
+
+              <section className="play-card play-session">
+                <div className="play-card-title"><span>Состояние сейчас</span><small>Сохраняется автоматически</small></div>
+                <div className="play-state-grid">
+                  <label><span>Ранения</span><input type="number" min="0" max="3" value={character.wounds} onChange={(event) => update("wounds", Math.min(3, Math.max(0, safeNumber(event.target.value))))} /></label>
+                  <label><span>Усталость</span><input type="number" min="0" max="2" value={character.fatigue} onChange={(event) => update("fatigue", Math.min(2, Math.max(0, safeNumber(event.target.value))))} /></label>
+                  <label><span>Фишки</span><input type="number" min="0" value={character.sessionBennies} onChange={(event) => update("sessionBennies", Math.max(0, safeNumber(event.target.value)))} /></label>
+                  <label><span>Контакт с Чумой</span><input type="number" min="0" value={character.plagueExposure} onChange={(event) => update("plagueExposure", Math.max(0, safeNumber(event.target.value)))} /></label>
+                </div>
+                <div className="play-toggles"><label><input type="checkbox" checked={character.shaken} onChange={(event) => update("shaken", event.target.checked)} /> В шоке</label><label><input type="checkbox" checked={character.infected} onChange={(event) => update("infected", event.target.checked)} /> Заражён Чумой</label></div>
+              </section>
+
+              <section className="play-card">
+                <div className="play-card-title"><span>Черты и изъяны</span></div>
+                <div className="play-traits-grid">
+                  <div><h3>Черты</h3>{character.edges.filter((entry) => entry.name.trim()).map((entry) => <p key={entry.id}><b>{entry.name}</b>{entry.note && <span>{entry.note}</span>}</p>)}</div>
+                  <div><h3>Изъяны</h3>{character.hindrances.filter((entry) => entry.name.trim()).map((entry) => <p key={entry.id}><b>{entry.name}</b>{entry.note && <span>{entry.note}</span>}</p>)}</div>
+                </div>
+              </section>
+
+              <section className="play-card">
+                <div className="play-card-title"><span>Навыки</span><small>Только изученные</small></div>
+                <div className="play-skills-grid">
+                  {playSkills.map((skill) => <div key={skill.id}><span>{skill.name}</span><small>{ATTRIBUTE_META.find((attribute) => attribute.key === skill.attribute)?.abbr}</small><strong>{dieLabel(skill.level)}</strong></div>)}
+                </div>
+              </section>
+
+              <section className="play-card play-equipment">
+                <div className="play-card-title"><span>Оружие и снаряжение</span><small>{inventoryWeight.toLocaleString("ru-RU")} / {loadLimit} кг · {character.florins || 0} фл.</small></div>
+                {playWeapons.length > 0 ? <div className="play-weapons">{playWeapons.map((weapon) => <article key={weapon.id}><div><b>{weapon.name}</b><span>{weapon.range || "Ближний бой"} · урон {weapon.damage || "-"}{weapon.ap && weapon.ap !== "-" ? ` · ББ ${weapon.ap}` : ""}</span></div>{weapon.ammo && weapon.ammo !== "-" && <label><span>Потрачено / {weapon.ammo}</span><input type="number" min="0" value={character.ammoSpent[weapon.id] || 0} onChange={(event) => update("ammoSpent", { ...character.ammoSpent, [weapon.id]: Math.max(0, safeNumber(event.target.value)) })} /></label>}</article>)}</div> : <p className="play-empty">Оружие не записано.</p>}
+                {character.inventory.length > 0 && <div className="play-inventory">{character.inventory.map((item) => <div key={item.id}><label>{(item.category === "Доспех" || item.category === "Щит") && <input type="checkbox" checked={item.equipped} onChange={(event) => setEquipmentWorn(item.id, event.target.checked)} />}<b>{item.name}</b></label><span>{item.quantity} шт. · {(item.weight * item.quantity).toLocaleString("ru-RU")} кг</span></div>)}</div>}
+                {character.gear && <p className="play-gear-note">{character.gear}</p>}
+                <button className="play-manage-equipment" type="button" onClick={() => setEditingLockedHero(true)}>Управлять снаряжением</button>
+              </section>
+            </div>
+          )}
+
+          <div className="character-editor" hidden={character.creationLocked && !editingLockedHero}>
+          {character.creationLocked && editingLockedHero && <div className="edit-mode-banner"><div><b>Редактирование досье</b><span>Параметры создания меняются через повышения; остальные записи можно исправлять свободно.</span></div><button type="button" onClick={() => setEditingLockedHero(false)}>Вернуться к игре</button></div>}
           <div className="intro-card">
             <span className="eyebrow">Без писарской муки</span>
             <h2>Расскажите о герое.<br />Вёрстку сделаем мы.</h2>
@@ -2076,6 +2153,7 @@ export default function Home() {
           <div className={`creation-lock creation-lock-final ${character.creationLocked ? "is-locked" : ""}`}>
             <div><b>{character.creationLocked ? "Создание завершено" : "Завершение создания"}</b><span>{character.creationLocked ? "Развитие параметров теперь проходит через кнопку повышения." : "Зафиксируйте стартового героя, когда распределите пункты и выберете черты."}</span></div>
             {!character.creationLocked && <button type="button" disabled={!creationReady} onClick={lockCreation}>Зафиксировать героя</button>}
+          </div>
           </div>
         </section>
 
