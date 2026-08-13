@@ -256,6 +256,7 @@ details[open] summary::after { content: "−"; }
 .creation-lock button { padding: 7px 10px; color: #fff7e9; background: #762126; border: 0; font-size: 9px; font-weight: 800; }
 .creation-lock button:disabled { opacity: .35; cursor: not-allowed; }
 .creation-lock.is-locked { border-left: 3px solid #607b68; }
+.creation-lock-final { max-width: 700px; margin: 14px auto 0; }
 .creation-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
 .creation-fields:disabled { opacity: .7; }
 
@@ -759,6 +760,7 @@ details[open] summary::after { content: "−"; }
   .equipment-summary, .state-grid { grid-template-columns: 1fr 1fr; }
   .equipment-catalog { grid-template-columns: 1fr; }
   .form-footer { align-items: flex-start; flex-direction: column; }
+  .creation-lock-final { align-items: flex-start; flex-direction: column; }
 }
 
 @page { size: A4 portrait; margin: 0; }

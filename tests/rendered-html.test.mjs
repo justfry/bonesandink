@@ -94,6 +94,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /function edgeRequirementIssues/);
   assert.match(page, /creationLocked/);
   assert.match(page, /Зафиксировать героя/);
+  assert.ok(page.indexOf("Зафиксировать героя") > page.indexOf('className="form-footer"'));
   assert.match(page, /Состояние в игре/);
   assert.match(page, /Потраченный боезапас/);
   assert.match(page, /Настройки PDF/);

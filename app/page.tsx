@@ -1827,10 +1827,6 @@ export default function Home() {
                   </ol>
                 )}
               </div>
-              <div className={`creation-lock ${character.creationLocked ? "is-locked" : ""}`}>
-                <div><b>{character.creationLocked ? "Создание завершено" : "Завершение создания"}</b><span>{character.creationLocked ? "Развитие параметров теперь проходит через кнопку повышения." : "Зафиксируйте стартового героя, когда распределите пункты и выберете черты."}</span></div>
-                {!character.creationLocked && <button type="button" disabled={!creationReady} onClick={lockCreation}>Зафиксировать героя</button>}
-              </div>
               {character.purity === "Нечистый" && (
                 <div className="warning-box">
                   Нечистый невосприимчив к Чуме, заразен и обречён восстать после смерти.
@@ -2076,6 +2072,10 @@ export default function Home() {
           <div className="form-footer">
             <button className="button danger" onClick={resetAll}>Очистить анкету</button>
             <p>Правила сверены с локальными PDF SWADE и Ultima Forsan. Итоговые черты и снаряжение всё равно согласуйте с ведущим.</p>
+          </div>
+          <div className={`creation-lock creation-lock-final ${character.creationLocked ? "is-locked" : ""}`}>
+            <div><b>{character.creationLocked ? "Создание завершено" : "Завершение создания"}</b><span>{character.creationLocked ? "Развитие параметров теперь проходит через кнопку повышения." : "Зафиксируйте стартового героя, когда распределите пункты и выберете черты."}</span></div>
+            {!character.creationLocked && <button type="button" disabled={!creationReady} onClick={lockCreation}>Зафиксировать героя</button>}
           </div>
         </section>
 
