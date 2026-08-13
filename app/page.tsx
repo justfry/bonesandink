@@ -25,6 +25,8 @@ type TraitEntry = {
 type TraitGuide = {
   name: string;
   detail: string;
+  minorDetail?: string;
+  majorDetail?: string;
   requirements?: string;
   severity?: "minor" | "major" | "either";
   source: "SWADE" | "Ultima Forsan";
@@ -480,62 +482,62 @@ const CAMPAIGN_UNAVAILABLE_EDGE_NAMES = new Set([
 
 const HINDRANCE_GUIDES: TraitGuide[] = [
   { name: "Болезненность", severity: "minor", detail: "-2 к Выносливости при сопротивлении Усталости.", source: "SWADE" },
-  { name: "В розыске", severity: "either", detail: "Персонажа разыскивают представители закона; масштаб зависит от тяжести.", source: "SWADE" },
+  { name: "В розыске", severity: "either", detail: "Персонажа разыскивают представители закона; масштаб зависит от тяжести.", minorDetail: "Разыскивается за сравнительно небольшое преступление или далеко от места основных событий.", majorDetail: "Разыскивается за тяжкое преступление; преследование активно и представляет постоянную угрозу.", source: "SWADE" },
   { name: "Верный друг", severity: "minor", detail: "У героя есть невероятно надёжный друг или союзник, за которого приходится отвечать.", source: "SWADE" },
-  { name: "Враг", severity: "either", detail: "Героя преследует недоброжелатель; крупный враг опаснее и влиятельнее.", source: "SWADE" },
+  { name: "Враг", severity: "either", detail: "Героя преследует недоброжелатель; крупный враг опаснее и влиятельнее.", minorDetail: "Героя преследует одиночка или опасная группа, которая появляется лишь время от времени.", majorDetail: "Героя преследует могущественный соперник, представитель власти или целая организация.", source: "SWADE" },
   { name: "Героизм", severity: "major", detail: "Герой обязан помогать нуждающимся, даже когда это опасно.", source: "SWADE" },
   { name: "Длинный язык", severity: "minor", detail: "Часто выдаёт важные сведения не тем людям.", source: "SWADE" },
-  { name: "Дурная привычка", severity: "either", detail: "Зависимость или навязчивая привычка; без неё герой получает Усталость.", source: "SWADE" },
+  { name: "Дурная привычка", severity: "either", detail: "Зависимость или навязчивая привычка; без неё герой получает Усталость.", minorDetail: "Раздражающая, но безопасная привычка: она отталкивает окружающих и создаёт социальные неудобства.", majorDetail: "Опасная зависимость: без дозы в течение 24 часов герой проверяет Выносливость и при провале получает Усталость.", source: "SWADE" },
   { name: "Дурной характер", severity: "minor", detail: "-1 к проверкам Убеждения.", source: "SWADE" },
-  { name: "Жадность", severity: "either", detail: "Слишком озабочен деньгами и собственностью.", source: "SWADE" },
+  { name: "Жадность", severity: "either", detail: "Слишком озабочен деньгами и собственностью.", minorDetail: "Яростно спорит о своей доле добычи и всегда старается получить побольше.", majorDetail: "Не успокоится, пока не получит всё, что считает своим; способен на крайности ради добычи.", source: "SWADE" },
   { name: "Жажда крови", severity: "major", detail: "Не упускает возможности добить поверженного противника.", source: "SWADE" },
-  { name: "Жестокость", severity: "either", detail: "Готов идти по головам; тяжесть определяет предел бесчеловечности.", source: "SWADE" },
-  { name: "Заблуждение", severity: "either", detail: "Искренне верит в то, что расходится с реальностью.", source: "SWADE" },
-  { name: "Зависть", severity: "either", detail: "Стремится отнять или превзойти то, чем обладают другие.", source: "SWADE" },
+  { name: "Жестокость", severity: "either", detail: "Готов идти по головам; тяжесть определяет предел бесчеловечности.", minorDetail: "Не станет по-настоящему вредить другим, пока они намеренно не мешают достижению его целей.", majorDetail: "Без колебаний расправится с любым, кто встанет на пути к его цели.", source: "SWADE" },
+  { name: "Заблуждение", severity: "either", detail: "Искренне верит в то, что расходится с реальностью.", minorDetail: "Заблуждение безвредно или герой обычно держит его при себе.", majorDetail: "Открыто и часто действует согласно опасному заблуждению, что приводит к серьёзным последствиям.", source: "SWADE" },
+  { name: "Зависть", severity: "either", detail: "Стремится отнять или превзойти то, чем обладают другие.", minorDetail: "Ревностно оберегает или присваивает себе одно конкретное достижение или положение.", majorDetail: "Завидует всему чужому успеху, строит козни и не прощает тех, кто его затмевает.", source: "SWADE" },
   { name: "Заносчивость", severity: "major", detail: "Всегда доказывает своё превосходство и ищет достойнейшего противника.", source: "SWADE" },
   { name: "Импульсивность", severity: "major", detail: "Сначала действует, потом думает.", source: "SWADE" },
-  { name: "Клятва", severity: "either", detail: "Принёс клятву и должен следовать ей; крупная клятва определяет жизнь героя.", source: "SWADE" },
+  { name: "Клятва", severity: "either", detail: "Принёс клятву и должен следовать ей; крупная клятва определяет жизнь героя.", minorDetail: "Клятва требует постоянного, но не слишком активного служения и лишь изредка мешает группе.", majorDetail: "Исполнение клятвы регулярно требует времени и сил, а иногда заставляет рисковать жизнью.", source: "SWADE" },
   { name: "Кодекс чести", severity: "major", detail: "Держит слово и ведёт себя достойно даже себе во вред.", source: "SWADE" },
   { name: "Коротышка", severity: "minor", detail: "Размер и Стойкость уменьшаются на 1.", source: "SWADE" },
   { name: "Косноязычие", severity: "major", detail: "-1 к Запугиванию, Убеждению и Насмешке.", source: "SWADE" },
   { name: "Кривые руки", severity: "minor", detail: "-2 при использовании механических устройств.", source: "SWADE" },
   { name: "Любопытство", severity: "major", detail: "Не может пройти мимо тайны или неизвестности.", source: "SWADE" },
   { name: "Медлительность", severity: "minor", detail: "В бою тянет две карты действия и обычно оставляет худшую.", source: "SWADE" },
-  { name: "Мстительность", severity: "either", detail: "Не забывает обид; крупная версия толкает на серьёзное возмездие.", source: "SWADE" },
+  { name: "Мстительность", severity: "either", detail: "Не забывает обид; крупная версия толкает на серьёзное возмездие.", minorDetail: "Добивается справедливости законными или сравнительно умеренными средствами.", majorDetail: "Ради мести пойдёт на всё и не отступится, пока обидчик не заплатит сполна.", source: "SWADE" },
   { name: "Мягкость", severity: "minor", detail: "-2 к проверкам Запугивания.", source: "SWADE" },
   { name: "Невезение", severity: "major", detail: "На 1 фишку меньше в начале каждой встречи.", source: "SWADE" },
   { name: "Неграмотность", severity: "minor", detail: "Не умеет читать и писать.", source: "SWADE", caution: "В Ultima Forsan герои по умолчанию грамотны; этот изъян отменяет правило мира." },
   { name: "Немота", severity: "major", detail: "Не способен разговаривать.", source: "SWADE" },
   { name: "Неуклюжесть", severity: "major", detail: "-2 к Атлетике и Скрытности.", source: "SWADE" },
   { name: "Неумение плавать", severity: "minor", detail: "−2 к Атлетике (плавание); каждая клетка в воде стоит 3 клетки движения.", source: "SWADE" },
-  { name: "Обидчивость", severity: "either", detail: "Хуже сопротивляется Насмешкам: -2 или -4 по тяжести.", source: "SWADE" },
-  { name: "Обязательства", severity: "either", detail: "Должен посвящать обязанностям значительную часть недели.", source: "SWADE" },
-  { name: "Одержимость идеей", severity: "either", detail: "Подчиняет решения великой цели; крупная версия почти всепоглощающая.", source: "SWADE" },
+  { name: "Обидчивость", severity: "either", detail: "Хуже сопротивляется Насмешкам: -2 или -4 по тяжести.", minorDetail: "−2 на встречные проверки против Насмешки.", majorDetail: "−4 на встречные проверки против Насмешки.", source: "SWADE" },
+  { name: "Обязательства", severity: "either", detail: "Должен посвящать обязанностям значительную часть недели.", minorDetail: "Обязанности отнимают около 20 часов в неделю.", majorDetail: "Обязанности отнимают около 40 часов в неделю или больше.", source: "SWADE" },
+  { name: "Одержимость идеей", severity: "either", detail: "Подчиняет решения великой цели; крупная версия почти всепоглощающая.", minorDetail: "Цель изредка толкает героя к активным действиям и обычно не влечёт серьёзных последствий.", majorDetail: "Стремление регулярно захватывает все мысли и действия героя, создавая проблемы ему и группе.", source: "SWADE" },
   { name: "Отсутствие глаза", severity: "major", detail: "-2 к действиям, зависящим от зрения, на средней и дальней дистанции.", source: "SWADE" },
   { name: "Отсутствие руки", severity: "major", detail: "-4 к задачам, для которых нужны обе руки.", source: "SWADE" },
-  { name: "Паранойя", severity: "either", detail: "Никому не доверяет; при крупной версии помощь герою затруднена.", source: "SWADE" },
-  { name: "Пацифизм", severity: "either", detail: "Мелкий: дерётся лишь для самозащиты; крупный: не дерётся вовсе.", source: "SWADE" },
+  { name: "Паранойя", severity: "either", detail: "Никому не доверяет; при крупной версии помощь герою затруднена.", minorDetail: "С трудом доверяет людям, требует гарантий и порой подозревает даже союзников.", majorDetail: "Крайне недоверчив; все попытки оказать ему Помощь получают штраф −2.", source: "SWADE" },
+  { name: "Пацифизм", severity: "either", detail: "Мелкий: дерётся лишь для самозащиты; крупный: не дерётся вовсе.", minorDetail: "Прибегает к насилию, только когда нет иного выхода, и не допускает убийства беззащитных.", majorDetail: "Не нападает на живых разумных существ; применяет нелетальные методы только для защиты себя или других.", source: "SWADE" },
   { name: "Перестраховщик", severity: "minor", detail: "Излишне осторожен и склонен слишком долго планировать.", source: "SWADE" },
-  { name: "Плохое зрение", severity: "either", detail: "-1 или -2 к зрительным проверкам; очки обычно отменяют штраф.", source: "SWADE" },
-  { name: "Позор", severity: "either", detail: "В прошлом героя есть постыдный поступок или пятно на репутации.", source: "SWADE" },
+  { name: "Плохое зрение", severity: "either", detail: "-1 или -2 к зрительным проверкам; очки обычно отменяют штраф.", minorDetail: "−1 к проверкам параметров, связанным со зрением; подходящие очки обычно отменяют штраф.", majorDetail: "−2 к проверкам параметров, связанным со зрением; подходящие очки обычно отменяют штраф.", source: "SWADE" },
+  { name: "Позор", severity: "either", detail: "В прошлом героя есть постыдный поступок или пятно на репутации.", minorDetail: "О постыдном прошлом знают сам герой и лишь несколько других людей.", majorDetail: "О позоре знают многие, включая людей, чьё мнение особенно важно для героя.", source: "SWADE" },
   { name: "Полнота", severity: "minor", detail: "+1 к Размеру, -1 к Шагу, бег d4; Сила ниже для требований нагрузки.", source: "SWADE" },
   { name: "Причуда", severity: "minor", detail: "Безобидная или неприятная странность поведения.", source: "SWADE" },
   { name: "Рассеянность", severity: "major", detail: "-1 к Осведомлённости и Вниманию.", source: "SWADE" },
   { name: "Самопожертвование", severity: "minor", detail: "Готов рисковать собой ради великой цели.", source: "SWADE" },
   { name: "Самоуверенность", severity: "major", detail: "Уверен, что способен справиться с любой угрозой.", source: "SWADE" },
-  { name: "Секрет", severity: "either", detail: "Скрывает опасную правду; тяжесть определяет последствия разоблачения.", source: "SWADE" },
+  { name: "Секрет", severity: "either", detail: "Скрывает опасную правду; тяжесть определяет последствия разоблачения.", minorDetail: "Разоблачение грозит серьёзными потерями, но не ставит на кон жизнь героя или другого человека.", majorDetail: "Разоблачение ведёт к крайне серьёзным, возможно смертельным последствиям.", source: "SWADE" },
   { name: "Слепота", severity: "major", detail: "-6 к действиям, требующим зрения; взамен даётся дополнительная черта.", source: "SWADE" },
   { name: "Старость", severity: "major", detail: "Медленнее и слабее физически, но получает дополнительные умственные навыки.", source: "SWADE" },
   { name: "Транжира", severity: "minor", detail: "Половина стартовых средств и постоянная склонность тратить деньги.", source: "SWADE" },
   { name: "Трусость", severity: "major", detail: "-2 к сопротивлению страху и Запугиванию.", source: "SWADE" },
-  { name: "Тугоухость", severity: "either", detail: "-4 к слуховому Вниманию; при крупной версии герой полностью глух.", source: "SWADE" },
+  { name: "Тугоухость", severity: "either", detail: "-4 к слуховому Вниманию; при крупной версии герой полностью глух.", minorDetail: "−4 ко всем проверкам Внимания, связанным со слухом, включая попытки проснуться от шума.", majorDetail: "Полностью глух и автоматически проваливает проверки Внимания, связанные со слухом.", source: "SWADE" },
   { name: "Упрямство", severity: "minor", detail: "Не признаёт ошибок и до последнего стоит на своём.", source: "SWADE" },
-  { name: "Уродство", severity: "either", detail: "-1 или -2 к Убеждению, когда внешность имеет значение.", source: "SWADE" },
-  { name: "Фобия", severity: "either", detail: "-1 или -2 ко всем проверкам рядом с объектом страха.", source: "SWADE" },
+  { name: "Уродство", severity: "either", detail: "-1 или -2 к Убеждению, когда внешность имеет значение.", minorDetail: "−1 к проверкам Убеждения, когда внешность имеет значение.", majorDetail: "−2 к проверкам Убеждения, когда внешность имеет значение.", source: "SWADE" },
+  { name: "Фобия", severity: "either", detail: "-1 или -2 ко всем проверкам рядом с объектом страха.", minorDetail: "−1 ко всем проверкам параметров рядом с объектом фобии.", majorDetail: "−2 ко всем проверкам параметров рядом с объектом фобии.", source: "SWADE" },
   { name: "Фома неверующий", severity: "minor", detail: "Не верит в сверхъестественное и потому опасно недооценивает его.", source: "SWADE" },
-  { name: "Хромота", severity: "either", detail: "Снижает Шаг и бег; крупная версия также даёт -2 к Атлетике.", source: "SWADE" },
-  { name: "Чужак", severity: "either", detail: "-2 к Убеждению; при крупной версии нет гражданских прав.", source: "SWADE" },
-  { name: "Юность", severity: "either", detail: "Меньше пунктов характеристик и навыков, но больше фишек.", source: "SWADE" },
+  { name: "Хромота", severity: "either", detail: "Снижает Шаг и бег; крупная версия также даёт -2 к Атлетике.", minorDetail: "Шаг −1, кость бега уменьшается на ступень; недоступна черта «Быстроногость».", majorDetail: "Шаг −2, кость бега уменьшается на ступень; −2 к Атлетике и встречным проверкам против неё; недоступна «Быстроногость».", source: "SWADE" },
+  { name: "Чужак", severity: "either", detail: "-2 к Убеждению; при крупной версии нет гражданских прав.", minorDetail: "−2 к Убеждению с теми, кто считает героя чужаком; его воспринимают как человека второго сорта.", majorDetail: "Как в мелкой версии, а также герой почти или совсем лишён прав в обществе, где происходят события.", source: "SWADE" },
+  { name: "Юность", severity: "either", detail: "Меньше пунктов характеристик и навыков, но больше фишек.", minorDetail: "Возраст 12–15 лет: 4 пункта характеристик, 10 пунктов навыков и +1 фишка в начале встречи.", majorDetail: "Возраст 8–11 лет: 3 пункта характеристик, 10 пунктов навыков, обязательный изъян «Коротышка» и +2 фишки в начале встречи.", source: "SWADE" },
   { name: "Слабое нутро", severity: "major", detail: "При каждом столкновении с ужасами Чумы проходит проверку Храбрости (Характера).", source: "Ultima Forsan" },
 ];
 
@@ -1109,6 +1111,12 @@ function AttributeDie({ die, current }: { die: Die; current: boolean }) {
   );
 }
 
+function traitGuideDetail(guide: TraitGuide, severity?: TraitEntry["severity"]) {
+  if (severity === "major" && guide.majorDetail) return guide.majorDetail;
+  if (severity === "minor" && guide.minorDetail) return guide.minorDetail;
+  return guide.detail;
+}
+
 function TraitGuideInput({
   kind,
   entry,
@@ -1133,6 +1141,8 @@ function TraitGuideInput({
   );
   const normalized = entry.name.trim().toLocaleLowerCase("ru");
   const exact = guides.find((guide) => guide.name.toLocaleLowerCase("ru") === normalized);
+  const exactSeverity = exact?.severity === "either" ? entry.severity || "minor" : exact?.severity;
+  const exactDetail = exact ? traitGuideDetail(exact, exactSeverity) : "";
   const suggestions = (normalized
     ? guides.filter((guide) => guide.name.toLocaleLowerCase("ru").includes(normalized))
     : guides
@@ -1146,9 +1156,12 @@ function TraitGuideInput({
   const exactRankAllowed = kind === "hindrance" || !exact || rankAllows(rank, exact);
 
   const choose = (guide: TraitGuide) => {
+    const severity = kind === "hindrance"
+      ? guide.severity === "either" ? entry.severity || "minor" : guide.severity
+      : undefined;
     onChange({
       name: guide.name,
-      note: guide.detail,
+      note: traitGuideDetail(guide, severity),
       ...(kind === "hindrance" && guide.severity !== "either"
         ? { severity: guide.severity }
         : {}),
@@ -1198,8 +1211,8 @@ function TraitGuideInput({
       )}
       {exact && (
         <div className={`guide-hint ${!exactRankAllowed ? "rank-mismatch" : ""}`}>
-          <span><b>{exact.source}</b>{exact.requirements && <>Требования: {exact.requirements}</>}</span>
-          <p>{exact.detail}</p>
+          <span><b>{exact.source}{kind === "hindrance" && <> · {exactSeverity === "major" ? "Крупный" : "Мелкий"}</>}</b>{exact.requirements && <>Требования: {exact.requirements}</>}</span>
+          <p>{exactDetail}</p>
           {!exactRankAllowed && <small className="rank-warning">Текущий ранг «{rank}» недостаточен. Черта доступна с ранга «{requiredRank(exact)}».</small>}
           {exact.caution && <small>{exact.caution}</small>}
         </div>
@@ -2202,7 +2215,16 @@ export default function Home() {
                 {character.hindrances.map((entry) => (
                   <div className="entry-row hindrance guided" key={entry.id}>
                     <TraitGuideInput kind="hindrance" rank={currentRank} entry={entry} onChange={(patch) => updateEntry<TraitEntry>("hindrances", entry.id, patch)} />
-                    <select aria-label="Тяжесть изъяна" value={entry.severity} onChange={(event) => updateEntry<TraitEntry>("hindrances", entry.id, { severity: event.target.value as TraitEntry["severity"] })}>
+                    <select aria-label="Тяжесть изъяна" value={entry.severity} onChange={(event) => {
+                      const severity = event.target.value as TraitEntry["severity"];
+                      const guide = HINDRANCE_GUIDES.find((item) => item.name.toLocaleLowerCase("ru") === entry.name.trim().toLocaleLowerCase("ru"));
+                      const generatedNotes = guide ? [guide.detail, guide.minorDetail, guide.majorDetail].filter(Boolean) : [];
+                      const canRefreshNote = !entry.note.trim() || generatedNotes.includes(entry.note);
+                      updateEntry<TraitEntry>("hindrances", entry.id, {
+                        severity,
+                        ...(guide && canRefreshNote ? { note: traitGuideDetail(guide, severity) } : {}),
+                      });
+                    }}>
                       <option value="minor">Мелкий</option>
                       <option value="major">Крупный</option>
                     </select>
