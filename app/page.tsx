@@ -1778,7 +1778,7 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <span className="theta" aria-hidden="true">Θ</span>
+          <span className="site-logo" aria-hidden="true"><img src="./hydra-logo-full-black.svg" alt="" /></span>
           <div>
             <p>Ultima Forsan</p>
             <h1>Лист персонажа</h1>

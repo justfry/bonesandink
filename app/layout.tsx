@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Лист персонажа Ultima Forsan",
   description: "Анкета, которая превращается в красивый печатный лист персонажа для Ultima Forsan и SWADE.",
+  icons: {
+    icon: [{ url: "/hydra-logo-full-black.svg", type: "image/svg+xml" }],
+    shortcut: "/hydra-logo-full-black.svg",
+  },
   openGraph: {
     title: "Лист персонажа Ultima Forsan",
     description: "Лист персонажа без писарской муки - заполните анкету и сохраните две красивые страницы A4.",

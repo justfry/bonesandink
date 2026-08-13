@@ -140,6 +140,8 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.creation-lock/);
   assert.match(css, /\.play-dashboard/);
   assert.match(css, /\.play-skills-grid/);
+  assert.match(page, /hydra-logo-full-black\.svg/);
+  assert.match(css, /\.site-logo img/);
   assert.match(page, /function PlayNumberStepper/);
   assert.match(page, /stepper-up/);
   assert.match(page, /stepper-down/);
