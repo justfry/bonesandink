@@ -1759,6 +1759,7 @@ export default function Home() {
   const duplicateHero = () => {
     const duplicatedCharacter = copyData(character);
     duplicatedCharacter.name = `${character.name || "Новый персонаж"} - копия`;
+    duplicatedCharacter.creationLocked = false;
     const hero = makeHeroRecord(duplicatedCharacter, skills, advanceHistory);
     setLibrary((current) => {
       const next: HeroLibrary = {

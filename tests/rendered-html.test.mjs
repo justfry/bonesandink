@@ -24,6 +24,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /LEGACY_STORAGE_KEY/);
   assert.match(page, /function makeHeroRecord/);
   assert.match(page, /const duplicateHero/);
+  assert.match(page, /duplicatedCharacter\.creationLocked = false/);
   assert.match(page, /Мои герои/);
   assert.match(page, /Сохранено автоматически/);
   assert.match(page, /SWADE для кампании/);
