@@ -77,7 +77,8 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /function preparePortrait/);
   assert.match(page, /accept="image\/jpeg,image\/png,image\/webp"/);
   assert.match(page, /Загрузить портрет/);
-  assert.match(page, /appearance-with-portrait/);
+  assert.match(page, /className="sheet-header-portrait"/);
+  assert.doesNotMatch(page, /className="sheet-seal"/);
   assert.match(page, /canvas\.toDataURL\("image\/jpeg"/);
   assert.match(page, /type AdvanceRecord/);
   assert.match(page, /function captureAdvanceState/);
@@ -119,6 +120,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.weapon-guide-menu/);
   assert.match(css, /\.weapon-guide-hint/);
   assert.match(css, /\.portrait-uploader/);
+  assert.match(css, /\.sheet-header-portrait/);
   assert.match(css, /filter: grayscale\(1\)/);
   assert.match(css, /\.advance-history/);
   assert.match(css, /\.hero-import-input/);

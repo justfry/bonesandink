@@ -2089,14 +2089,16 @@ export default function Home() {
           <div className="sheet-stack">
             <article className="character-sheet sheet-one">
               <div className="sheet-crop top-left" /><div className="sheet-crop top-right" />
-              <header className="sheet-header">
-                <div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div>
+              <header className="sheet-header sheet-header-primary">
+                <div className="sheet-header-portrait">
+                  {character.portrait && character.printPortrait && <img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt="" />}
+                </div>
                 <div className="sheet-title">
                   <small>ДОСЬЕ РЕКОНКИСТЫ / I</small>
                   <h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2>
                   <p>{character.archetype || "Архетип не выбран"}</p>
                 </div>
-                <div className="sheet-seal"><span>{character.purity === "Чистый" ? "C" : "N"}</span><small>{character.purity}</small></div>
+                <div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div>
               </header>
 
               <div className="sheet-rule"><span>REGNUM HOMINUM</span><i /><span>POST PLAGAM</span></div>
@@ -2136,7 +2138,7 @@ export default function Home() {
                     <div><small>Фишки</small><b>{character.bennies}</b></div>
                     <div className="blood-stat">
                       <small>Кровь</small>
-                      <b>{character.purity}</b>
+                      <b>{character.purity === "Нечистый" ? "Нечистая" : "Норма"}</b>
                       <p>{character.purity === "Нечистый" ? "Иммунитет к Чуме · заразная кровь · восстанет после смерти" : "Обычный человек · 1 бесплатная черта при создании"}</p>
                     </div>
                   </div>
@@ -2176,9 +2178,9 @@ export default function Home() {
             <article className="character-sheet sheet-two">
               <div className="sheet-crop top-left" /><div className="sheet-crop top-right" />
               <header className="sheet-header compact">
-                <div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div>
-                <div className="sheet-title"><small>ДОСЬЕ РЕКОНКИСТЫ / II</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div>
                 <div className="folio">II</div>
+                <div className="sheet-title"><small>ДОСЬЕ РЕКОНКИСТЫ / II</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div>
+                <div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div>
               </header>
 
               <section className="sheet-section weapons-section second-page-weapons">
@@ -2213,10 +2215,7 @@ export default function Home() {
 
               <section className="appearance-print second-page-appearance">
                 <h3><span>X</span> Описание и приметы</h3>
-                <div className={character.portrait && character.printPortrait ? "appearance-with-portrait" : ""}>
-                  {character.portrait && character.printPortrait && <figure><img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt="" /></figure>}
-                  <p>{character.appearance || (character.portrait && character.printPortrait ? "" : "Место для портрета, примет и слов очевидцев.")}</p>
-                </div>
+                <div><p>{character.appearance || "Место для примет и слов очевидцев."}</p></div>
               </section>
 
               <section className="sheet-section biography-print">
@@ -2243,7 +2242,7 @@ export default function Home() {
 
               <footer className="sheet-footer"><span>SWADE - адаптация кампании</span><b>Θ</b><span>Лист II / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
-            {character.printExtraNotesPage && <article className="character-sheet notes-page"><div className="sheet-crop top-left" /><div className="sheet-crop top-right" /><header className="sheet-header compact"><div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div><div className="sheet-title"><small>ПОЛЕВОЙ ЖУРНАЛ / III</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div><div className="folio">III</div></header><section><h3>Заметки, улики и долги</h3>{Array.from({ length: 28 }).map((_, index) => <i key={index} />)}</section><footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист III / III</span></footer></article>}
+            {character.printExtraNotesPage && <article className="character-sheet notes-page"><div className="sheet-crop top-left" /><div className="sheet-crop top-right" /><header className="sheet-header compact"><div className="folio">III</div><div className="sheet-title"><small>ПОЛЕВОЙ ЖУРНАЛ / III</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div><div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div></header><section><h3>Заметки, улики и долги</h3>{Array.from({ length: 28 }).map((_, index) => <i key={index} />)}</section><footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист III / III</span></footer></article>}
           </div>
         </section>
       </div>
