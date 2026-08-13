@@ -140,6 +140,10 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.creation-lock/);
   assert.match(css, /\.play-dashboard/);
   assert.match(css, /\.play-skills-grid/);
+  assert.match(page, /function PlayNumberStepper/);
+  assert.match(page, /stepper-up/);
+  assert.match(page, /stepper-down/);
+  assert.match(css, /\.play-number-controls button::before/);
   assert.match(css, /\.split-entries > div \{ min-width: 0;/);
   assert.match(css, /@container form-panel \(min-width: 780px\)/);
   assert.match(css, /\.state-grid/);

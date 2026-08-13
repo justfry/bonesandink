@@ -913,6 +913,42 @@ function Field({
   );
 }
 
+function PlayNumberStepper({
+  label,
+  value,
+  min = 0,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  onChange: (value: number) => void;
+}) {
+  const clamp = (nextValue: number) => Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min, Math.floor(nextValue)));
+  return (
+    <div className="play-number-field">
+      <span>{label}</span>
+      <div className="play-number-stepper">
+        <input
+          aria-label={label}
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => { if (Number.isFinite(event.currentTarget.valueAsNumber)) onChange(clamp(event.currentTarget.valueAsNumber)); }}
+        />
+        <div className="play-number-controls">
+          <button type="button" className="stepper-up" aria-label={`Увеличить: ${label}`} disabled={max !== undefined && value >= max} onClick={() => onChange(clamp(value + 1))} />
+          <button type="button" className="stepper-down" aria-label={`Уменьшить: ${label}`} disabled={value <= min} onClick={() => onChange(clamp(value - 1))} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TextAreaField({
   label,
   value,
@@ -1833,10 +1869,10 @@ export default function Home() {
               <section className="play-card play-session">
                 <div className="play-card-title"><span>Состояние сейчас</span><small>Сохраняется автоматически</small></div>
                 <div className="play-state-grid">
-                  <label><span>Ранения</span><input type="number" min="0" max="3" value={character.wounds} onChange={(event) => update("wounds", Math.min(3, Math.max(0, safeNumber(event.target.value))))} /></label>
-                  <label><span>Усталость</span><input type="number" min="0" max="2" value={character.fatigue} onChange={(event) => update("fatigue", Math.min(2, Math.max(0, safeNumber(event.target.value))))} /></label>
-                  <label><span>Фишки</span><input type="number" min="0" value={character.sessionBennies} onChange={(event) => update("sessionBennies", Math.max(0, safeNumber(event.target.value)))} /></label>
-                  <label><span>Контакт с Чумой</span><input type="number" min="0" value={character.plagueExposure} onChange={(event) => update("plagueExposure", Math.max(0, safeNumber(event.target.value)))} /></label>
+                  <PlayNumberStepper label="Ранения" value={character.wounds} max={3} onChange={(value) => update("wounds", value)} />
+                  <PlayNumberStepper label="Усталость" value={character.fatigue} max={2} onChange={(value) => update("fatigue", value)} />
+                  <PlayNumberStepper label="Фишки" value={character.sessionBennies} onChange={(value) => update("sessionBennies", value)} />
+                  <PlayNumberStepper label="Контакт с Чумой" value={character.plagueExposure} onChange={(value) => update("plagueExposure", value)} />
                 </div>
                 <div className="play-toggles"><label><input type="checkbox" checked={character.shaken} onChange={(event) => update("shaken", event.target.checked)} /> В шоке</label><label><input type="checkbox" checked={character.infected} onChange={(event) => update("infected", event.target.checked)} /> Заражён Чумой</label></div>
               </section>
