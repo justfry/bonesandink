@@ -2019,7 +2019,8 @@ export default function Home() {
 
           <details open>
             <summary><span>04</span> Черты и изъяны</summary>
-            <fieldset className="section-body split-entries creation-fields" disabled={character.creationLocked}>
+            <div className="section-body">
+            <fieldset className="split-entries creation-fields" disabled={character.creationLocked}>
               <div>
                 <div className="entry-title">
                   <h3>Черты</h3>
@@ -2058,6 +2059,7 @@ export default function Home() {
                 <button className="add-row" disabled={character.hindrances.length >= 8} onClick={() => update("hindrances", [...character.hindrances, blankHindrance()])}>+ Добавить изъян</button>
               </div>
             </fieldset>
+            </div>
           </details>
 
           <details open>
