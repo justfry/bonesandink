@@ -793,6 +793,8 @@ function restoreSkills(value?: Skill[]): Skill[] {
     return {
       ...skill,
       ...(saved || {}),
+      name: skill.name,
+      attribute: skill.attribute,
       level: Math.max(saved?.level || 0, migratedLevel, skill.core ? 4 : 0) as Die,
       core: skill.core,
     };
@@ -2136,9 +2138,15 @@ export default function Home() {
                     ) : (
                       <strong>{skill.name}{skill.core ? <em>базовый</em> : null}</strong>
                     )}
-                    <select aria-label={`Характеристика для ${skill.name}`} value={skill.attribute} onChange={(event) => updateSkill(skill.id, { attribute: event.target.value as AttributeKey })}>
-                      {ATTRIBUTE_META.map((attribute) => <option key={attribute.key} value={attribute.key}>{attribute.abbr}</option>)}
-                    </select>
+                    {skill.id.startsWith("custom-") ? (
+                      <select aria-label={`Характеристика для ${skill.name}`} value={skill.attribute} onChange={(event) => updateSkill(skill.id, { attribute: event.target.value as AttributeKey })}>
+                        {ATTRIBUTE_META.map((attribute) => <option key={attribute.key} value={attribute.key}>{attribute.abbr}</option>)}
+                      </select>
+                    ) : (
+                      <span className="skill-attribute" title={`Связан с характеристикой «${ATTRIBUTE_META.find((attribute) => attribute.key === skill.attribute)?.label}»`}>
+                        {ATTRIBUTE_META.find((attribute) => attribute.key === skill.attribute)?.abbr}
+                      </span>
+                    )}
                     <DieSelect label={`Уровень навыка ${skill.name}`} value={skill.level} onChange={(level) => updateSkill(skill.id, { level })} />
                     <span className="skill-cost">{skillCost(skill, character.attributes)}</span>
                     {skill.id.startsWith("custom-") && <button className="remove" aria-label="Удалить навык" onClick={() => setSkills((current) => current.filter((item) => item.id !== skill.id))}>×</button>}

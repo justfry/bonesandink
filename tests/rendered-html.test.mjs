@@ -29,6 +29,8 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /Сохранено автоматически/);
   assert.match(page, /SWADE для кампании/);
   assert.match(page, /const skillBudget = 12/);
+  assert.match(page, /className="skill-attribute"/);
+  assert.match(page, /name: skill\.name,[\s\S]*attribute: skill\.attribute/);
   assert.doesNotMatch(page, /Книга Ultima Forsan/);
   assert.match(page, /const SWADE_ADAPTATIONS/);
   assert.match(page, /const LEGACY_SKILL_TARGETS/);
