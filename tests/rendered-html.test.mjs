@@ -132,6 +132,11 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.advance-history/);
   assert.match(css, /\.hero-import-input/);
   assert.match(css, /\.equipment-catalog/);
+  assert.match(page, /const setEquipmentQuantity/);
+  assert.match(page, /equipment-card-select/);
+  assert.match(page, /equipment-quantity/);
+  assert.match(css, /\.equipment-card\.is-selected/);
+  assert.match(css, /\.equipment-card-select:focus-visible/);
   assert.match(css, /\.creation-lock/);
   assert.match(css, /\.play-dashboard/);
   assert.match(css, /\.play-skills-grid/);

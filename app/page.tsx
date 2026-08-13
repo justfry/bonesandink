@@ -1321,6 +1321,29 @@ export default function Home() {
     });
   };
 
+  const setEquipmentQuantity = (guideId: string, requestedQuantity: number) => {
+    const guide = EQUIPMENT_GUIDES.find((item) => item.id === guideId);
+    if (!guide) return;
+    setCharacter((current) => {
+      const existing = current.inventory.find((item) => item.id === guide.id);
+      const currentQuantity = existing?.quantity || 0;
+      const florins = safeNumber(current.florins);
+      const affordableMaximum = currentQuantity + Math.floor(florins / guide.price);
+      const quantity = Math.min(Math.max(0, Math.floor(requestedQuantity)), affordableMaximum);
+      const difference = quantity - currentQuantity;
+      if (quantity === currentQuantity) return current;
+      return {
+        ...current,
+        florins: String(florins - difference * guide.price),
+        inventory: quantity === 0
+          ? current.inventory.filter((item) => item.id !== guide.id)
+          : existing
+            ? current.inventory.map((item) => item.id === guide.id ? { ...item, quantity } : item)
+            : [...current.inventory, { ...guide, quantity, equipped: guide.category === "Доспех" || guide.category === "Щит" }],
+      };
+    });
+  };
+
   const setEquipmentWorn = (id: string, equipped: boolean) => {
     setCharacter((current) => ({
       ...current,
@@ -2092,13 +2115,29 @@ export default function Home() {
               <div className="equipment-store">
                 <h3>Броня, щиты и припасы</h3>
                 <div className="equipment-catalog">
-                  {EQUIPMENT_GUIDES.map((guide) => (
-                    <article key={guide.id}>
-                      <span>{guide.category}</span><b>{guide.name}</b><p>{guide.detail}</p>
-                      <small>{guide.price} фл. · {guide.weight} кг{guide.armor ? ` · броня +${guide.armor}` : ""}{guide.parry ? ` · Защита +${guide.parry}` : ""}</small>
-                      <button type="button" disabled={safeNumber(character.florins) < guide.price} onClick={() => purchaseEquipment(guide.id)}>Купить</button>
-                    </article>
-                  ))}
+                  {EQUIPMENT_GUIDES.map((guide) => {
+                    const selectedItem = character.inventory.find((item) => item.id === guide.id);
+                    const cannotAfford = !selectedItem && safeNumber(character.florins) < guide.price;
+                    return (
+                      <article className={`equipment-card${selectedItem ? " is-selected" : ""}${cannotAfford ? " is-unaffordable" : ""}`} key={guide.id}>
+                        <span>{guide.category}</span><b>{guide.name}</b><p>{guide.detail}</p>
+                        <small>{guide.price} фл. · {guide.weight} кг{guide.armor ? ` · броня +${guide.armor}` : ""}{guide.parry ? ` · Защита +${guide.parry}` : ""}</small>
+                        {selectedItem ? (
+                          <div className="equipment-quantity" aria-label={`Количество: ${guide.name}`}>
+                            <span>Количество</span>
+                            <button type="button" aria-label={`Уменьшить количество: ${guide.name}`} onClick={() => setEquipmentQuantity(guide.id, selectedItem.quantity - 1)}>−</button>
+                            <input aria-label={`Количество: ${guide.name}`} type="number" min="1" value={selectedItem.quantity} onFocus={(event) => event.currentTarget.select()} onChange={(event) => { if (Number.isFinite(event.currentTarget.valueAsNumber)) setEquipmentQuantity(guide.id, event.currentTarget.valueAsNumber); }} />
+                            <button type="button" aria-label={`Увеличить количество: ${guide.name}`} disabled={safeNumber(character.florins) < guide.price} onClick={() => setEquipmentQuantity(guide.id, selectedItem.quantity + 1)}>+</button>
+                          </div>
+                        ) : (
+                          <>
+                            <button className="equipment-card-select" type="button" aria-label={`Выбрать: ${guide.name}`} disabled={cannotAfford} onClick={() => purchaseEquipment(guide.id)} />
+                            <span className="equipment-card-action">{cannotAfford ? "Не хватает флоринов" : "Выбрать"}</span>
+                          </>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
               {character.inventory.length > 0 && <div className="inventory-list"><h3>В рюкзаке и на герое</h3>{character.inventory.map((item) => <div key={item.id}><label>{(item.category === "Доспех" || item.category === "Щит") && <input type="checkbox" checked={item.equipped} onChange={(event) => setEquipmentWorn(item.id, event.target.checked)} />}<b>{item.name}</b></label><span>{item.quantity} шт. · {(item.weight * item.quantity).toLocaleString("ru-RU")} кг</span><button type="button" onClick={() => sellEquipment(item.id)}>Вернуть</button></div>)}</div>}
