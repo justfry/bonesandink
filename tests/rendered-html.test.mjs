@@ -5,15 +5,19 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("character generator contains the printable flow and SWADE safeguards", async () => {
-  const [page, css, layout] = await Promise.all([
+  const [page, css, layout, pagesConfig, staticIndex] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/globals.css", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("vite.pages.config.ts", root), "utf8"),
+    readFile(new URL("index.html", root), "utf8"),
   ]);
 
   assert.match(layout, /lang="ru"/);
   assert.match(layout, /Лист персонажа Ultima Forsan/);
   assert.match(layout, /hydra-favicon-white\.svg/);
+  assert.match(pagesConfig, /base: "\/bonesandink\/"/);
+  assert.match(staticIndex, /hydra-favicon-white\.svg/);
   assert.match(page, /window\.print\(\)/);
   assert.match(page, /localStorage/);
   assert.match(page, /ultima-forsan-heroes-v2/);
@@ -144,6 +148,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /hydra-logo-full-black\.svg/);
   assert.match(css, /\.site-logo img/);
   assert.match(page, /function PlayNumberStepper/);
+  assert.doesNotMatch(page, /shooting: 6/);
   assert.match(page, /stepper-up/);
   assert.match(page, /stepper-down/);
   assert.match(css, /\.play-number-controls button::before/);

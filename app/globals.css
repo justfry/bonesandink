@@ -273,7 +273,7 @@ details[open] summary::after { content: "−"; }
 .field-grid { display: grid; gap: 14px; }
 .field-grid.two { grid-template-columns: 1fr 1fr; }
 .field { display: flex; flex-direction: column; gap: 6px; position: relative; }
-.field > span, .derived-grid label > span {
+.field > span, .derived-grid label > span, .derived-control > span {
   color: #71665d;
   font-size: 9px;
   font-weight: 800;

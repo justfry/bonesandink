@@ -687,12 +687,14 @@ const createInitialCharacter = (): Character => ({
 
 function restoreCharacter(value?: Partial<Character>): Character {
   const initial = createInitialCharacter();
-  const legacy = (value || {}) as Partial<Character> & {
+  const rest = { ...(value || {}) } as Partial<Character> & {
     rank?: unknown;
     rulesMode?: unknown;
     charisma?: unknown;
   };
-  const { rank: _rank, rulesMode: _rulesMode, charisma: _charisma, ...rest } = legacy;
+  delete rest.rank;
+  delete rest.rulesMode;
+  delete rest.charisma;
   return {
     ...initial,
     ...rest,
@@ -1240,11 +1242,14 @@ export default function Home() {
       const active = restoredLibrary.heroes.find(
         (hero) => hero.id === restoredLibrary?.activeHeroId,
       ) || restoredLibrary.heroes[0];
+      // Hydration intentionally restores persisted state after the client mounts.
+      /* eslint-disable react-hooks/set-state-in-effect */
       setLibrary(restoredLibrary);
       setActiveHeroId(active.id);
       setCharacter(copyData(active.character));
       setSkills(copyData(active.skills));
       setAdvanceHistory(copyData(active.advanceHistory));
+      /* eslint-enable react-hooks/set-state-in-effect */
       localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(restoredLibrary));
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
@@ -1645,7 +1650,7 @@ export default function Home() {
       createInitialSkills().map((skill) => ({
         ...skill,
         level:
-          ({ notice: 8, plague: 8, healing: 8, research: 6, persuasion: 6, fighting: 4, shooting: 6 } as Record<string, Die>)[skill.id] ??
+          ({ notice: 8, plague: 8, healing: 8, research: 6, persuasion: 6, fighting: 4 } as Record<string, Die>)[skill.id] ??
           skill.level,
       })),
     );
@@ -2025,7 +2030,7 @@ export default function Home() {
                 <label><span>Броня</span><input type="number" value={character.armor} onChange={(event) => update("armor", safeNumber(event.target.value))} /></label>
                 <label><span>Размер</span><input type="number" value={character.size} onChange={(event) => update("size", safeNumber(event.target.value))} /></label>
                 <label><span>Шаг</span><input type="number" value={character.pace} onChange={(event) => update("pace", safeNumber(event.target.value, 6))} /></label>
-                <label><span>Бег</span><DieSelect label="Кость бега" value={character.runningDie} allowUntrained={false} onChange={(value) => update("runningDie", value)} /></label>
+                <div className="derived-control"><span>Бег</span><DieSelect label="Кость бега" value={character.runningDie} allowUntrained={false} onChange={(value) => update("runningDie", value)} /></div>
                 <label><span>Фишки</span><input type="number" value={character.bennies} onChange={(event) => update("bennies", safeNumber(event.target.value, 3))} /></label>
               </div>
             </div>

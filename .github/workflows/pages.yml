@@ -26,3 +26,9 @@ jobs:
 
       - name: Build static site
         run: npm run build:pages
+
+      - name: Verify project asset paths
+        run: |
+          grep -q 'src="/bonesandink/assets/' pages-dist/index.html
+          grep -q 'href="/bonesandink/assets/' pages-dist/index.html
+          test -f pages-dist/hydra-favicon-white.svg
