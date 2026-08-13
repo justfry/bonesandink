@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "Лист персонажа Ultima Forsan",
   description: "Анкета, которая превращается в красивый печатный лист персонажа для Ultima Forsan и SWADE.",
   icons: {
-    icon: [{ url: "/hydra-logo-full-black.svg", type: "image/svg+xml" }],
-    shortcut: "/hydra-logo-full-black.svg",
+    icon: [{ url: "/hydra-favicon-white.svg", type: "image/svg+xml" }],
+    shortcut: "/hydra-favicon-white.svg",
   },
   openGraph: {
     title: "Лист персонажа Ultima Forsan",

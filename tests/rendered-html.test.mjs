@@ -13,6 +13,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
 
   assert.match(layout, /lang="ru"/);
   assert.match(layout, /Лист персонажа Ultima Forsan/);
+  assert.match(layout, /hydra-favicon-white\.svg/);
   assert.match(page, /window\.print\(\)/);
   assert.match(page, /localStorage/);
   assert.match(page, /ultima-forsan-heroes-v2/);
