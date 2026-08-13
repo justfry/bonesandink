@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type Die = 0 | 4 | 6 | 8 | 10 | 12;
 type AttributeKey = "agility" | "smarts" | "spirit" | "strength" | "vigor";
-type RulesMode = "swade" | "setting";
+type Rank = "Новичок" | "Закалённый" | "Ветеран" | "Герой" | "Легенда";
+type AdvanceType = "edge" | "skills" | "attribute" | "hindrance";
 
 type Skill = {
   id: string;
@@ -21,6 +22,15 @@ type TraitEntry = {
   severity?: "minor" | "major";
 };
 
+type TraitGuide = {
+  name: string;
+  detail: string;
+  requirements?: string;
+  severity?: "minor" | "major" | "either";
+  source: "SWADE" | "Ultima Forsan";
+  caution?: string;
+};
+
 type Weapon = {
   id: string;
   name: string;
@@ -28,30 +38,59 @@ type Weapon = {
   damage: string;
   ap: string;
   ammo: string;
+  price?: number;
+  weight?: number;
+  purchased?: boolean;
 };
 
+type WeaponGuide = Omit<Weapon, "id"> & {
+  category: "Стрелковое" | "Метательное" | "Тычковое" | "Древковое" | "Топоры" | "Клинки" | "Булавы";
+  detail: string;
+};
+
+type EquipmentGuide = {
+  id: string;
+  name: string;
+  category: "Доспех" | "Щит" | "Припасы" | "Инструмент";
+  price: number;
+  weight: number;
+  armor?: number;
+  parry?: number;
+  detail: string;
+};
+
+type InventoryItem = EquipmentGuide & { quantity: number; equipped: boolean };
+
 type Character = {
-  rulesMode: RulesMode;
   name: string;
   player: string;
   archetype: string;
-  rank: string;
   advances: string;
+  edgeAdvances: string;
+  skillAdvancePoints: number;
+  attributeAdvancePoints: number;
+  attributeRaiseRanks: Rank[];
+  retiredHindrancePoints: number;
   origin: string;
   age: string;
   purity: "Чистый" | "Нечистый";
   appearance: string;
+  portrait: string;
+  portraitX: number;
+  portraitY: number;
+  portraitZoom: number;
+  creationLocked: boolean;
   attributes: Record<AttributeKey, Die>;
   armor: number;
   size: number;
   pace: number;
   runningDie: Die;
   bennies: number;
-  charisma: number;
   languages: string;
   edges: TraitEntry[];
   hindrances: TraitEntry[];
   weapons: Weapon[];
+  inventory: InventoryItem[];
   gear: string;
   florins: string;
   homeland: string;
@@ -62,6 +101,46 @@ type Character = {
   bonds: string;
   notes: string;
   wildArcana: string;
+  wounds: number;
+  fatigue: number;
+  shaken: boolean;
+  infected: boolean;
+  sessionBennies: number;
+  plagueExposure: number;
+  ammoSpent: Record<string, number>;
+  printPortrait: boolean;
+  printDiceValues: boolean;
+  printExtraNotesPage: boolean;
+};
+
+type AdvanceSnapshot = Pick<Character,
+  "advances" | "edgeAdvances" | "skillAdvancePoints" | "attributeAdvancePoints" |
+  "attributeRaiseRanks" | "retiredHindrancePoints" | "attributes" | "edges" | "hindrances"
+> & { skills: Skill[] };
+
+type AdvanceRecord = {
+  id: string;
+  number: number;
+  rank: Rank;
+  type: AdvanceType;
+  summary: string;
+  createdAt: string;
+  before: AdvanceSnapshot;
+};
+
+type SavedHero = {
+  id: string;
+  character: Character;
+  skills: Skill[];
+  advanceHistory: AdvanceRecord[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type HeroLibrary = {
+  version: 2;
+  activeHeroId: string;
+  heroes: SavedHero[];
 };
 
 const ATTRIBUTE_META: { key: AttributeKey; label: string; abbr: string }[] = [
@@ -73,6 +152,10 @@ const ATTRIBUTE_META: { key: AttributeKey; label: string; abbr: string }[] = [
 ];
 
 const DIE_OPTIONS: Die[] = [0, 4, 6, 8, 10, 12];
+const ATTRIBUTE_DICE: Die[] = [4, 6, 8, 10, 12];
+const RANKS: Rank[] = ["Новичок", "Закалённый", "Ветеран", "Герой", "Легенда"];
+const LIBRARY_STORAGE_KEY = "ultima-forsan-heroes-v2";
+const LEGACY_STORAGE_KEY = "ultima-forsan-character-v1";
 
 const ARCHETYPES = [
   "Алхимик",
@@ -99,6 +182,404 @@ const ARCHETYPES = [
   "Шарлатан",
   "Свободный архетип",
 ];
+
+const WEAPON_GUIDES: WeaponGuide[] = [
+  { name: "Лук", category: "Стрелковое", range: "12/24/48", damage: "2d6", ap: "-", ammo: "стрелы", detail: "Мин. Сила d6; цена 200 флоринов." },
+  { name: "Длинный лук", category: "Стрелковое", range: "14/28/56", damage: "2d6", ap: "-", ammo: "стрелы", detail: "Мин. Сила d8; цена 250 флоринов." },
+  { name: "Арбалет", category: "Стрелковое", range: "15/30/60", damage: "2d6", ap: "2", ammo: "болты", detail: "Мин. Сила d6; перезарядка 2 действия; цена 500 флоринов." },
+  { name: "Лёгкий арбалет", category: "Стрелковое", range: "6/12/24", damage: "2d4", ap: "1", ammo: "болты", detail: "Не требует минимальной Силы; цена 200 флоринов." },
+  { name: "Аркебуза", category: "Стрелковое", range: "4/8/16", damage: "1-3d6", ap: "-", ammo: "1", detail: "Мин. Сила d6; перезарядка 2. +2 к Стрельбе, урон зависит от дистанции." },
+  { name: "Бомбарда", category: "Стрелковое", range: "14/28/56", damage: "особый", ap: "2", ammo: "1", detail: "Мин. Сила d12; тяжёлое оружие, перезарядка 2. Ядро наносит 2d10, возможна картечь." },
+  { name: "Двуствольный пистоль", category: "Стрелковое", range: "5/10/20", damage: "2d6+1", ap: "-", ammo: "2", detail: "Перезарядка 2; можно сделать двойной выстрел. Цена 450 флоринов." },
+  { name: "Дробовой пистоль", category: "Стрелковое", range: "3/6/12", damage: "1-3d4", ap: "-", ammo: "1", detail: "Перезарядка 2. +2 к Стрельбе, урон зависит от дистанции." },
+  { name: "Кремнёвый пистоль", category: "Стрелковое", range: "5/10/20", damage: "2d6+1", ap: "-", ammo: "1", detail: "Перезарядка 2; цена 150 флоринов." },
+  { name: "Мушкет", category: "Стрелковое", range: "10/20/40", damage: "2d8", ap: "-", ammo: "1", detail: "Мин. Сила d6; перезарядка 2; цена 300 флоринов." },
+  { name: "Петриналь", category: "Стрелковое", range: "8/16/32", damage: "2d6+1", ap: "-", ammo: "1", detail: "Перезарядка 2; лёгкое ружьё с упором в грудь." },
+  { name: "Копьё (метательное)", category: "Метательное", range: "3/6/12", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Мин. Сила d6; можно использовать и в ближнем бою." },
+  { name: "Нож (метательный)", category: "Метательное", range: "3/6/12", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Лёгкое скрываемое оружие; цена 25 флоринов." },
+  { name: "Праща", category: "Метательное", range: "4/8/16", damage: "Сил+d4", ap: "-", ammo: "камни", detail: "Дешёвое и доступное оружие; цена 10 флоринов." },
+  { name: "Топор (метательный)", category: "Метательное", range: "3/6/12", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Цена 50 флоринов." },
+  { name: "Выкидной катар", category: "Тычковое", range: "Ближняя", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Скрытый клинок на предплечье; высвобождается свободным действием." },
+  { name: "Катар", category: "Тычковое", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Тычковый клинок; цена 250 флоринов." },
+  { name: "Пуддха", category: "Тычковое", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Тяжёлое тычковое оружие; цена 350 флоринов." },
+  { name: "Алебарда", category: "Древковое", range: "Ближняя (1)", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Двуручное; дальность 1; цена 250 флоринов." },
+  { name: "Боевой заступ", category: "Древковое", range: "Ближняя (1)", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Двуручное; дальность 1; создано для борьбы с мертвецами." },
+  { name: "Копьё", category: "Древковое", range: "Ближняя (1)", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Двуручное; Защита +1; дальность 1." },
+  { name: "Коса", category: "Древковое", range: "Ближняя (1)", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Двуручное; Защита -1; дальность 1." },
+  { name: "Пика", category: "Древковое", range: "Ближняя (2)", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Двуручное; дальность 2; цена 400 флоринов." },
+  { name: "Посох", category: "Древковое", range: "Ближняя (1)", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Двуручное; Защита +1; дальность 1." },
+  { name: "Рыцарское копьё", category: "Древковое", range: "Ближняя (2)", damage: "Сил+d8", ap: "2*", ammo: "-", detail: "Только для всадника; дальность 2; ББ 2 при атаке верхом." },
+  { name: "Строевой заступ", category: "Древковое", range: "Ближняя (2)", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Двуручное; дальность 2; создано для борьбы с мертвецами." },
+  { name: "Бродэкс", category: "Топоры", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Защита -1; при использовании двумя руками урон +1." },
+  { name: "Двуручный топор", category: "Топоры", range: "Ближняя", damage: "Сил+d10", ap: "1", ammo: "-", detail: "Двуручное; ББ 1; Защита -1." },
+  { name: "Секира", category: "Топоры", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Тяжёлый боевой топор; цена 300 флоринов." },
+  { name: "Топор", category: "Топоры", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Одноручный топор; цена 200 флоринов." },
+  { name: "Двуручный меч", category: "Клинки", range: "Ближняя", damage: "Сил+d10", ap: "-", ammo: "-", detail: "Двуручное; Защита -1." },
+  { name: "Двуручная сабля", category: "Клинки", range: "Ближняя", damage: "Сил+d10", ap: "-", ammo: "-", detail: "Двуручное; Защита -1." },
+  { name: "Длинный меч", category: "Клинки", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Надёжный одноручный клинок; цена 300 флоринов." },
+  { name: "Кинжал", category: "Клинки", range: "Ближняя", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Лёгкий и скрываемый клинок; цена 25 флоринов." },
+  { name: "Короткий меч", category: "Клинки", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Одноручный клинок; цена 200 флоринов." },
+  { name: "Полуторный меч", category: "Клинки", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Защита -1; при использовании двумя руками урон +1." },
+  { name: "Сабля", category: "Клинки", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Одноручный клинок; цена 350 флоринов." },
+  { name: "Скимитар", category: "Клинки", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Лёгкий изогнутый клинок; цена 250 флоринов." },
+  { name: "Шпага", category: "Клинки", range: "Ближняя", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Защита +1; цена 150 флоринов." },
+  { name: "Боевой молот", category: "Булавы", range: "Ближняя", damage: "Сил+d6", ap: "1*", ammo: "-", detail: "ББ 1 только против жёстких доспехов." },
+  { name: "Боевой цеп", category: "Булавы", range: "Ближняя", damage: "Сил+d8", ap: "-", ammo: "-", detail: "Двуручное; Защита -1; игнорирует щит и укрытие." },
+  { name: "Булава", category: "Булавы", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Простое ударное оружие; цена 150 флоринов." },
+  { name: "Дубина", category: "Булавы", range: "Ближняя", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Дешёвое ударное оружие; цена 10 флоринов." },
+  { name: "Кистень", category: "Булавы", range: "Ближняя", damage: "Сил+d6", ap: "-", ammo: "-", detail: "Игнорирует щит и укрытие." },
+  { name: "Кувалда", category: "Булавы", range: "Ближняя", damage: "Сил+d8", ap: "2*", ammo: "-", detail: "Двуручное; Защита -1; ББ 2 только против жёстких доспехов." },
+  { name: "Лёгкий кистень", category: "Булавы", range: "Ближняя", damage: "Сил+d4", ap: "-", ammo: "-", detail: "Игнорирует щит и укрытие; цена 150 флоринов." },
+];
+
+const EQUIPMENT_GUIDES: EquipmentGuide[] = [
+  { id: "leather-arms", name: "Кожаные наручи", category: "Доспех", armor: 1, price: 10, weight: 2, detail: "Закрывают руки." },
+  { id: "leather-torso", name: "Кожаный панцирь", category: "Доспех", armor: 1, price: 20, weight: 3, detail: "Закрывает торс." },
+  { id: "leather-legs", name: "Кожаные поножи", category: "Доспех", armor: 1, price: 20, weight: 3, detail: "Закрывают ноги." },
+  { id: "catcher-suit", name: "Костюм ловца мертвецов", category: "Доспех", armor: 1, price: 60, weight: 8, detail: "Торс, руки и ноги; 50% защиты головы." },
+  { id: "chain-arms", name: "Кольчужные рукава", category: "Доспех", armor: 2, price: 80, weight: 3, detail: "Закрывают руки." },
+  { id: "chain-torso", name: "Кольчуга", category: "Доспех", armor: 2, price: 100, weight: 4, detail: "Закрывает торс." },
+  { id: "chain-legs", name: "Кольчужные шоссы", category: "Доспех", armor: 2, price: 120, weight: 5, detail: "Закрывают ноги." },
+  { id: "plate-arms", name: "Латные наручи", category: "Доспех", armor: 3, price: 200, weight: 5, detail: "Закрывают руки." },
+  { id: "plate-torso", name: "Латная кираса", category: "Доспех", armor: 3, price: 400, weight: 12.5, detail: "Закрывает торс." },
+  { id: "plate-legs", name: "Латные поножи", category: "Доспех", armor: 3, price: 300, weight: 7.5, detail: "Закрывают ноги." },
+  { id: "open-helmet", name: "Открытый шлем", category: "Доспех", armor: 3, price: 75, weight: 2, detail: "50% защиты головы." },
+  { id: "closed-helmet", name: "Закрытый шлем", category: "Доспех", armor: 3, price: 150, weight: 4, detail: "Закрывает голову." },
+  { id: "buckler", name: "Малый щит (баклер)", category: "Щит", parry: 1, price: 25, weight: 4, detail: "Защита +1 от фронтальных атак и атак слева." },
+  { id: "medium-shield", name: "Средний щит", category: "Щит", parry: 1, price: 50, weight: 6, detail: "Защита +1; броня +2 против дистанционных атак." },
+  { id: "large-shield", name: "Большой щит (ростовой)", category: "Щит", parry: 2, price: 200, weight: 10, detail: "Защита +2; броня +2 против дистанционных атак." },
+  { id: "plague-mask", name: "Маска чумного доктора", category: "Инструмент", price: 10, weight: 0, detail: "+1 к Выносливости против миазм, -1 к социальному впечатлению." },
+  { id: "alchemist-bag", name: "Сумка алхимика", category: "Инструмент", price: 300, weight: 3, detail: "Инструменты для изготовления алхимических препаратов." },
+  { id: "witch-bag", name: "Сумка ведьмы", category: "Инструмент", price: 150, weight: 2, detail: "Компоненты и предметы для ведьмовских фокусов." },
+  { id: "lockpicks", name: "Отмычки", category: "Инструмент", price: 200, weight: 0.5, detail: "Набор для вскрытия замков." },
+  { id: "rope", name: "Верёвка, 20 м", category: "Припасы", price: 10, weight: 7.5, detail: "Прочная дорожная верёвка." },
+  { id: "lantern", name: "Фонарь", category: "Припасы", price: 25, weight: 1.5, detail: "Освещает радиус 4 клетки." },
+  { id: "rations", name: "Дорожный паёк", category: "Припасы", price: 25, weight: 5, detail: "Запас еды на одну неделю." },
+  { id: "last-hope", name: "Топор Последней Надежды", category: "Инструмент", price: 5, weight: 1, detail: "Для экстренной ампутации заражённой конечности." },
+  { id: "cautery", name: "Пузырёк прижигателя", category: "Припасы", price: 5, weight: 0.5, detail: "Останавливает наружное кровотечение и прижигает рану." },
+];
+
+const WEAPON_PURCHASE_DATA: Record<string, { price: number; weight: number }> = {
+  "Лук": { price: 200, weight: 1.5 }, "Длинный лук": { price: 250, weight: 2.5 }, "Арбалет": { price: 500, weight: 5 }, "Лёгкий арбалет": { price: 200, weight: 1.5 },
+  "Аркебуза": { price: 300, weight: 6 }, "Бомбарда": { price: 700, weight: 15 }, "Двуствольный пистоль": { price: 450, weight: 2 }, "Дробовой пистоль": { price: 250, weight: 1.5 },
+  "Кремнёвый пистоль": { price: 150, weight: 1.5 }, "Мушкет": { price: 300, weight: 8 }, "Петриналь": { price: 300, weight: 2 }, "Копьё (метательное)": { price: 25, weight: 2.5 },
+  "Нож (метательный)": { price: 25, weight: .5 }, "Праща": { price: 10, weight: .5 }, "Топор (метательный)": { price: 50, weight: 1 }, "Выкидной катар": { price: 100, weight: 1 },
+  "Катар": { price: 250, weight: 1.5 }, "Пуддха": { price: 350, weight: 4 }, "Алебарда": { price: 250, weight: 7.5 }, "Боевой заступ": { price: 50, weight: 5 },
+  "Копьё": { price: 200, weight: 2.5 }, "Коса": { price: 50, weight: 6.5 }, "Пика": { price: 400, weight: 12.5 }, "Посох": { price: 10, weight: 4 },
+  "Рыцарское копьё": { price: 300, weight: 5 }, "Строевой заступ": { price: 100, weight: 8 }, "Бродэкс": { price: 350, weight: 7 }, "Двуручный топор": { price: 500, weight: 7.5 },
+  "Секира": { price: 300, weight: 5 }, "Топор": { price: 200, weight: 1 }, "Двуручный меч": { price: 400, weight: 6 }, "Двуручная сабля": { price: 450, weight: 5 },
+  "Длинный меч": { price: 300, weight: 4 }, "Кинжал": { price: 25, weight: .5 }, "Короткий меч": { price: 200, weight: 2 }, "Полуторный меч": { price: 350, weight: 5 },
+  "Сабля": { price: 350, weight: 3 }, "Скимитар": { price: 250, weight: 1.5 }, "Шпага": { price: 150, weight: 1.5 }, "Боевой молот": { price: 250, weight: 4 },
+  "Боевой цеп": { price: 350, weight: 5.5 }, "Булава": { price: 150, weight: 4 }, "Дубина": { price: 10, weight: 4 }, "Кистень": { price: 200, weight: 4 },
+  "Кувалда": { price: 400, weight: 10 }, "Лёгкий кистень": { price: 150, weight: 3.5 },
+};
+
+const EDGE_GUIDES: TraitGuide[] = [
+  { name: "Амбидекстр", requirements: "Новичок, Ловкость d8+", detail: "Убирает штраф за действия непривычной рукой.", source: "SWADE" },
+  { name: "Аристократ", requirements: "Новичок", detail: "+2 к Осведомлённости и социальным связям в высших кругах.", source: "SWADE" },
+  { name: "Бдительность", requirements: "Новичок", detail: "+2 к проверкам Внимания.", source: "SWADE" },
+  { name: "Берсерк", requirements: "Новичок", detail: "В ярости повышает Силу и Стойкость и частично игнорирует ранения, но теряет контроль.", source: "SWADE" },
+  { name: "Богатство", requirements: "Новичок", detail: "Тройной стартовый капитал и постоянный высокий доход.", source: "SWADE" },
+  { name: "Бугай", requirements: "Новичок, Сила d6+, Выносливость d6+", detail: "+1 к Размеру и Стойкости; Сила выше для нагрузки и требований снаряжения.", source: "SWADE" },
+  { name: "Быстроногость", requirements: "Новичок, Ловкость d6+", detail: "+2 к Шагу, кость бега увеличивается на ступень.", source: "SWADE" },
+  { name: "Везение", requirements: "Новичок", detail: "+1 фишка в начале каждой встречи.", source: "SWADE" },
+  { name: "Везение+", requirements: "Новичок, Везение", detail: "+2 фишки в начале каждой встречи вместо одной.", source: "SWADE" },
+  { name: "Как на собаке", requirements: "Новичок, Выносливость d8+", detail: "+2 к естественному выздоровлению; проверки проходят реже.", source: "SWADE" },
+  { name: "Обаяние", requirements: "Новичок, Характер d8+", detail: "Бесплатный переброс проверок Убеждения.", source: "SWADE" },
+  { name: "Полиглот", requirements: "Новичок, Смекалка d6+", detail: "Даёт несколько языков на уровне d6 по Смекалке персонажа.", source: "SWADE" },
+  { name: "Привлекательность", requirements: "Новичок, Выносливость d6+", detail: "+1 к Выступлению и Убеждению, когда внешность имеет значение.", source: "SWADE" },
+  { name: "Силач", requirements: "Новичок, Сила d6+, Выносливость d6+", detail: "Связывает Атлетику с Силой и увеличивает дальность метания.", source: "SWADE" },
+  { name: "Слава", requirements: "Новичок", detail: "+1 к Убеждению, если героя узнали; выступления оплачиваются лучше.", source: "SWADE" },
+  { name: "Смелость", requirements: "Новичок, Характер d6+", detail: "+2 к сопротивлению страху и -2 к броскам по таблице ужаса.", source: "SWADE" },
+  { name: "Стремительность", requirements: "Новичок, Ловкость d8+", detail: "Позволяет перетянуть низкую карту действия.", source: "SWADE" },
+  { name: "Упорство", requirements: "Новичок, Характер d8+", detail: "+2 к результату проверки параметра, переброшенной за фишку.", source: "SWADE" },
+  { name: "Беглый огонь", requirements: "Закалённый, Стрельба d6+", detail: "Для одной дистанционной атаки в ход Скорострельность оружия увеличивается на 1.", source: "SWADE" },
+  { name: "Беспощадность", requirements: "Закалённый", detail: "+2 к урону, если потратить фишку на его переброс.", source: "SWADE", caution: "В книге Ultima Forsan эта черта указана как недоступная; для кампании согласуйте с ведущим." },
+  { name: "Блок", requirements: "Закалённый, Драка d8+", detail: "+1 к Защите и ослабляет бонус врагов за объединение сил.", source: "SWADE" },
+  { name: "Боевая закалка", requirements: "Закалённый", detail: "+2 к попыткам выйти из шока и оправиться от оглушения.", source: "SWADE" },
+  { name: "Боевая ярость", requirements: "Закалённый, Драка d8+", detail: "Исключительным действием добавляет вторую кость Драки к одной атаке в ход.", source: "SWADE" },
+  { name: "Боец-импровизатор", requirements: "Закалённый, Смекалка d6+", detail: "Игнорирует штраф -2 при атаке импровизированным оружием.", source: "SWADE" },
+  { name: "Воля к победе", requirements: "Закалённый", detail: "Бесплатный переброс любой уловки, начатой персонажем.", source: "SWADE" },
+  { name: "Два клинка", requirements: "Новичок, Ловкость d8+", detail: "Одна атака оружием во второй руке без штрафа за несколько действий.", source: "SWADE" },
+  { name: "Два ствола", requirements: "Новичок, Ловкость d8+", detail: "Один выстрел или бросок второй рукой без штрафа за несколько действий.", source: "SWADE" },
+  { name: "Двойной выстрел", requirements: "Закалённый, Стрельба d6+", detail: "+1 к атаке и урону одиночным оружием за дополнительный патрон.", source: "SWADE" },
+  { name: "Именное оружие", requirements: "Новичок, соответствующий навык d8+", detail: "+1 к атаке выбранным оружием; в ближнем бою также +1 к Защите.", source: "SWADE" },
+  { name: "Контратака", requirements: "Закалённый, Драка d8+", detail: "Свободная атака по противнику, провалившему Драку против героя.", source: "SWADE" },
+  { name: "Крепкий орешек", requirements: "Новичок, Характер d8+", detail: "Штрафы за ранения не мешают проверкам Выносливости при смерти.", source: "SWADE" },
+  { name: "Круговой удар", requirements: "Новичок, Сила d8+, Драка d8+", detail: "Одна атака по всем целям в пределах оружия; обычно со штрафом.", source: "SWADE" },
+  { name: "Мастер боевых искусств", requirements: "Новичок, Драка d6+", detail: "+1 к безоружной Драке и дополнительная кость урона d4.", source: "SWADE" },
+  { name: "Меткий стрелок", requirements: "Закалённый, Атлетика или Стрельба d8+", detail: "Снижает дистанционные штрафы или даёт +1 к атаке, если герой не двигался.", source: "SWADE" },
+  { name: "Паркур", requirements: "Новичок, Ловкость d8+, Атлетика d6+", detail: "Игнорирует труднопроходимую местность и помогает в пеших погонях.", source: "SWADE" },
+  { name: "Разрыв дистанции", requirements: "Новичок, Ловкость d8+", detail: "Один противник не получает свободную атаку при выходе героя из ближнего боя.", source: "SWADE" },
+  { name: "Расчётливость", requirements: "Новичок, Смекалка d8+", detail: "На низкой карте действия игнорирует до 2 пунктов штрафа одного действия.", source: "SWADE" },
+  { name: "Стальная челюсть", requirements: "Новичок, Выносливость d8+", detail: "+2 к проверкам на прочность и против нокаута.", source: "SWADE" },
+  { name: "Стальные нервы", requirements: "Новичок, Выносливость d8+", detail: "Игнорирует 1 пункт штрафа за ранения.", source: "SWADE" },
+  { name: "Твёрдая рука", requirements: "Новичок, Ловкость d8+", detail: "Игнорирует штраф за ненадёжную опору; штраф за бег уменьшается.", source: "SWADE" },
+  { name: "Тяжеловес", requirements: "Новичок, Сила d8+, Выносливость d8+", detail: "+1 к Стойкости и дополнительная кость безоружного урона d4.", source: "SWADE" },
+  { name: "Увёртливость", requirements: "Закалённый, Ловкость d8+", detail: "Враги получают -2 к дистанционным атакам по герою.", source: "SWADE" },
+  { name: "Упреждающий удар", requirements: "Новичок, Ловкость d8+", detail: "Раз в раунд свободная атака по врагу, подошедшему на дистанцию удара.", source: "SWADE" },
+  { name: "Финт", requirements: "Новичок, Драка d8+", detail: "Герой выбирает, Ловкостью или Смекалкой враг сопротивляется уловке Дракой.", source: "SWADE" },
+  { name: "Хладнокровие", requirements: "Закалённый, Смекалка d8+", detail: "Тянет две карты действия и выбирает одну.", source: "SWADE" },
+  { name: "Боевой пыл", requirements: "Ветеран, Характер d8+, Командный голос", detail: "+1 к урону Дракой союзных статистов в командном радиусе.", source: "SWADE" },
+  { name: "Воодушевление", requirements: "Закалённый, Командный голос", detail: "Проверка Военного дела помогает одному параметру всех союзников в командном радиусе.", source: "SWADE" },
+  { name: "Держать строй!", requirements: "Закалённый, Смекалка d8+, Командный голос", detail: "+1 к Стойкости союзных статистов в командном радиусе.", source: "SWADE" },
+  { name: "Командный голос", requirements: "Новичок, Смекалка d6+", detail: "+1 союзным статистам на выход из шока и восстановление от оглушения.", source: "SWADE" },
+  { name: "Командный голос+", requirements: "Закалённый, Командный голос", detail: "Удваивает командный радиус.", source: "SWADE" },
+  { name: "Прирождённый лидер", requirements: "Закалённый, Характер d8+, Командный голос", detail: "Лидерские черты могут действовать на союзные дикие карты.", source: "SWADE" },
+  { name: "Тактик", requirements: "Закалённый, Командный голос, Военное дело d6+", detail: "Получает дополнительную карту действия и может передать её союзнику.", source: "SWADE" },
+  { name: "Глоток мужества", requirements: "Новичок, Выносливость d8+", detail: "Алкоголь повышает Выносливость и ослабляет штраф за ранения, но мешает Ловкости и Смекалке.", source: "SWADE" },
+  { name: "Запасливость", requirements: "Новичок, Везение", detail: "Раз за сцену герой внезапно находит при себе необходимый предмет.", source: "SWADE" },
+  { name: "Связь с животными", requirements: "Новичок", detail: "Герой может тратить свои фишки на действия подчинённого животного.", source: "SWADE" },
+  { name: "Укротитель", requirements: "Новичок, Характер d8+", detail: "Животные относятся к герою лучше; он получает питомца.", source: "SWADE" },
+  { name: "Целитель", requirements: "Новичок, Характер d8+", detail: "+2 к обычным и мистическим проверкам Лечения.", source: "SWADE" },
+  { name: "Шестое чувство", requirements: "Новичок", detail: "+2 к Вниманию для обнаружения засад и подобных опасностей.", source: "SWADE" },
+  { name: "Акробат", requirements: "Новичок, Ловкость d8+, Атлетика d8+", detail: "Бесплатный переброс Атлетики при акробатических действиях.", source: "SWADE" },
+  { name: "Вор", requirements: "Новичок, Ловкость d8+, Скрытность d6+, Воровство d6+", detail: "+1 к Воровству, лазанию и Скрытности в городе.", source: "SWADE" },
+  { name: "Егерь", requirements: "Новичок, Характер d6+, Выживание d8+", detail: "+2 к Выживанию и Скрытности в дикой местности.", source: "SWADE" },
+  { name: "Золотые руки", requirements: "Новичок, Ремонт d8+", detail: "+2 к Ремонту; с подъёмом работа занимает вдвое меньше времени.", source: "SWADE" },
+  { name: "Мастер на все руки", requirements: "Новичок, Смекалка d10+", detail: "Проверка Смекалки временно даёт незнакомый навык d4 или d6.", source: "SWADE" },
+  { name: "Солдат", requirements: "Новичок, Сила d6+, Выносливость d6+", detail: "Лучше переносит нагрузку и природные опасности.", source: "SWADE" },
+  { name: "Сыщик", requirements: "Новичок, Смекалка d8+, Поиск информации d8+", detail: "+2 к Поиску информации и Вниманию при поиске улик.", source: "SWADE" },
+  { name: "Убийца", requirements: "Новичок, Ловкость d8+, Драка d6+, Скрытность d8+", detail: "+2 к урону против уязвимого или застигнутого врасплох противника.", source: "SWADE" },
+  { name: "Умелец", requirements: "Новичок, Смекалка d6+, Внимание d8+, Ремонт d6+", detail: "Быстро собирает импровизированные устройства из подручных материалов.", source: "SWADE" },
+  { name: "Учёный", requirements: "Новичок, Поиск информации d8+", detail: "+2 к одному выбранному навыку знаний.", source: "SWADE" },
+  { name: "Вдохновитель", requirements: "Новичок, Характер d8+", detail: "Успешная уловка снимает Отвлечён или Уязвим с союзника.", source: "SWADE" },
+  { name: "Железная воля", requirements: "Новичок, Характер d8+", detail: "+2 к Смекалке и Характеру при сопротивлении уловкам.", source: "SWADE" },
+  { name: "Заводила", requirements: "Новичок, Характер d8+", detail: "Помощь Выступлением или Убеждением может одновременно помочь второму союзнику.", source: "SWADE" },
+  { name: "Мы - команда!", requirements: "Новичок, дикая карта, Характер d8+", detail: "Герой может передавать фишки другим диким картам.", source: "SWADE" },
+  { name: "Надёжный", requirements: "Новичок, Характер d8+", detail: "Бесплатный переброс проверок Помощи.", source: "SWADE" },
+  { name: "Острослов", requirements: "Новичок, Насмешка d8+", detail: "Бесплатный переброс проверок Насмешки.", source: "SWADE" },
+  { name: "Ответная колкость", requirements: "Новичок, Насмешка d6+", detail: "Подъём при сопротивлении Насмешке или Запугиванию делает противника Отвлечённым.", source: "SWADE" },
+  { name: "Полезные связи", requirements: "Новичок", detail: "Раз за встречу знакомые помогают или дают информацию.", source: "SWADE" },
+  { name: "Провокация", requirements: "Новичок, Насмешка d6+", detail: "Подъём в Насмешке заставляет противника сосредоточиться на герое.", source: "SWADE" },
+  { name: "Смутьян", requirements: "Закалённый, Характер d8+", detail: "Одна уловка Запугиванием или Насмешкой действует по области.", source: "SWADE" },
+  { name: "Уличное чутьё", requirements: "Новичок, Смекалка d6+", detail: "+2 к Осведомлённости и связям в преступной среде.", source: "SWADE" },
+  { name: "Верные спутники", requirements: "Легенда, дикая карта", detail: "У героя появляются пять верных спутников.", source: "SWADE" },
+  { name: "Искусный воин", requirements: "Легенда, Драка d12+", detail: "+1 к Защите; дополнительная кость урона Дракой становится d8.", source: "SWADE" },
+  { name: "Несгибаемый", requirements: "Легенда, Выносливость d8+", detail: "Герой выдерживает четвёртое ранение перед состоянием при смерти.", source: "SWADE" },
+  { name: "Помощник", requirements: "Легенда, дикая карта", detail: "Герой получает помощника - дикую карту.", source: "SWADE" },
+  { name: "Профессионал", requirements: "Легенда, максимальный уровень выбранного параметра", detail: "Текущий и максимальный уровень параметра повышаются на ступень.", source: "SWADE" },
+  { name: "Богатство+", requirements: "Новичок, Богатство", detail: "Пятикратный стартовый капитал и значительно более высокий постоянный доход.", source: "SWADE" },
+  { name: "Привлекательность+", requirements: "Новичок, Привлекательность", detail: "+2 к Выступлению и Убеждению, когда внешность имеет значение.", source: "SWADE" },
+  { name: "Слава+", requirements: "Закалённый, Слава", detail: "Узнаваемость приносит герою больший социальный бонус и доход.", source: "SWADE" },
+  { name: "Устойчивость к мистическим силам", requirements: "Новичок, Характер d8+", detail: "Вражеские проверки мистических навыков по герою получают -2, а урон от мистических сил снижается на 2.", source: "SWADE", caution: "В Ultima Forsan доступ к мистическим силам ограничен сеттингом; согласуйте применимость с ведущим." },
+  { name: "Устойчивость к мистическим силам+", requirements: "Новичок, Устойчивость к мистическим силам", detail: "Штраф к мистическим проверкам по герою и снижение урона увеличиваются до 4.", source: "SWADE", caution: "В Ultima Forsan доступ к мистическим силам ограничен сеттингом; согласуйте применимость с ведущим." },
+  { name: "Беглый огонь+", requirements: "Ветеран, Беглый огонь", detail: "Улучшает Беглый огонь и позволяет поддерживать высокий темп стрельбы эффективнее.", source: "SWADE" },
+  { name: "Блок+", requirements: "Ветеран, Блок", detail: "Бонус к Защите увеличивается до +2, а преимущество противников за объединение сил снижается сильнее.", source: "SWADE" },
+  { name: "Боевая ярость+", requirements: "Ветеран, Боевая ярость", detail: "При Боевой ярости герой добавляет третью кость Драки для одной атаки в ход.", source: "SWADE" },
+  { name: "Именное оружие+", requirements: "Закалённый, Именное оружие", detail: "Модификаторы именного оружия к атаке и Защите увеличиваются до +2.", source: "SWADE" },
+  { name: "Контратака+", requirements: "Ветеран, Контратака", detail: "Позволяет проводить Контратаку чаще одного раза за раунд.", source: "SWADE" },
+  { name: "Крепкий орешек+", requirements: "Ветеран, Крепкий орешек", detail: "Когда герой должен погибнуть, карта действия может оставить его при смерти и позволить выжить.", source: "SWADE" },
+  { name: "Круговой удар+", requirements: "Ветеран, Круговой удар", detail: "Круговой удар больше не задевает союзников.", source: "SWADE" },
+  { name: "Мастер боевых искусств+", requirements: "Закалённый, Мастер боевых искусств", detail: "+2 к безоружной Драке; дополнительная кость урона увеличивается на ступень.", source: "SWADE" },
+  { name: "Могучий удар", requirements: "Новичок, дикая карта, Драка d8+", detail: "С джокером первая успешная атака Дракой наносит двойной урон.", source: "SWADE" },
+  { name: "Разрыв дистанции+", requirements: "Закалённый, Разрыв дистанции", detail: "До трёх противников не получают свободную атаку, когда герой выходит из ближнего боя.", source: "SWADE" },
+  { name: "Рок-н-ролл!", requirements: "Закалённый, Стрельба d8+", detail: "Игнорирует штрафы за отдачу оружия со Скорострельностью 2+, если стрелок не двигался.", source: "SWADE", caution: "Автоматическое оружие не соответствует обычной кампании Ultima Forsan; черта приведена для полноты справочника." },
+  { name: "Смертельный выстрел", requirements: "Новичок, дикая карта, Атлетика или Стрельба d8+", detail: "С джокером первая успешная атака метанием или Стрельбой наносит двойной урон.", source: "SWADE" },
+  { name: "Стальные нервы+", requirements: "Новичок, Стальные нервы", detail: "Герой игнорирует до 2 пунктов штрафа за ранения.", source: "SWADE" },
+  { name: "Тяжеловес+", requirements: "Закалённый, Тяжеловес", detail: "+2 к Стойкости; дополнительная кость безоружного урона увеличивается на ступень.", source: "SWADE" },
+  { name: "Убийца великанов", requirements: "Ветеран", detail: "+1d6 к урону по существу, которое больше героя как минимум на 3 пункта Размера.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; согласуйте её с ведущим." },
+  { name: "Увёртливость+", requirements: "Закалённый, Увёртливость", detail: "+2 к проверкам уклонения.", source: "SWADE" },
+  { name: "Упреждающий удар+", requirements: "Герой, Упреждающий удар", detail: "Позволяет применять Упреждающий удар по нескольким подходящим целям за раунд.", source: "SWADE" },
+  { name: "Хладнокровие+", requirements: "Закалённый, Хладнокровие", detail: "Герой тянет три карты действия и выбирает лучшую.", source: "SWADE" },
+  { name: "Тактик+", requirements: "Ветеран, Тактик", detail: "Герой получает две дополнительные карты действия для распределения между союзниками.", source: "SWADE" },
+  { name: "Акробат+", requirements: "Закалённый, Акробат", detail: "Все атаки по герою получают -1, если не являются для него неожиданными.", source: "SWADE" },
+  { name: "Ас", requirements: "Новичок, Ловкость d8+", detail: "Игнорирует до 2 пунктов штрафа к управлению транспортом и может тратить фишки на его проверки на прочность.", source: "SWADE" },
+  { name: "Грозный вид", requirements: "Новичок, см. описание", detail: "+2 к проверкам Запугивания.", source: "SWADE" },
+  { name: "Железная воля+", requirements: "Закалённый, Железная воля, Смелость", detail: "Бонус +2 также действует при сопротивлении мистическим силам и избавлении от их эффектов.", source: "SWADE" },
+  { name: "Заводила+", requirements: "Закалённый, Заводила", detail: "Помощь социальными навыками может поддержать больше союзников.", source: "SWADE" },
+  { name: "Артефактор", requirements: "Закалённый, Мистический дар", detail: "Позволяет создавать магические предметы.", source: "SWADE", caution: "Применимость зависит от разрешённых в Ultima Forsan мистических даров." },
+  { name: "Воин света / тьмы", requirements: "Закалённый, Мистический дар (чудеса), Вера d6+", detail: "За пункты силы добавляет от +1 до +4 к проверкам на прочность.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Восстановление силы", requirements: "Закалённый, Характер d6+, Мистический дар", detail: "Герой восстанавливает 10 пунктов силы в час.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Восстановление силы+", requirements: "Ветеран, Восстановление силы", detail: "Ещё сильнее ускоряет восстановление пунктов силы.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Дополнительное усилие", requirements: "Закалённый, Мистический дар (феномен), Талант d6+", detail: "Улучшает результат проверки Таланта на +1 за 1 пункт силы или на +2 за 3 пункта.", source: "SWADE" },
+  { name: "Изобретатель", requirements: "Закалённый, Мистический дар (безумная наука), Безумная наука d6+", detail: "За 3 пункта силы создаёт устройство, имитирующее другую силу.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; вместо неё используйте сеттинговые изобретения." },
+  { name: "Иссушение духа", requirements: "Закалённый, Мистический дар, мистический навык d10+", detail: "Восстанавливает 5 пунктов силы ценой уровня Усталости.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Концентрация", requirements: "Закалённый, Мистический дар", detail: "Удваивает длительность всех немгновенных эффектов сил.", source: "SWADE" },
+  { name: "Менталист", requirements: "Закалённый, Мистический дар (псионика), Псионика d6+", detail: "+2 к встречным проверкам Псионики.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Новые силы", requirements: "Новичок, Мистический дар", detail: "Герой осваивает две новые силы.", source: "SWADE" },
+  { name: "Прилив силы", requirements: "Новичок, дикая карта, Мистический дар, мистический навык d8+", detail: "С джокером герой восстанавливает 10 пунктов силы.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Пункты силы", requirements: "Новичок, Мистический дар", detail: "+5 пунктов силы; черту можно брать не более одного раза за ранг.", source: "SWADE", caution: "В Ultima Forsan эта черта помечена как недоступная; приведена для полноты справочника." },
+  { name: "Управление потоком", requirements: "Закалённый, Мистический дар", detail: "При подъёме на проверке активации стоимость силы снижается на 1 пункт.", source: "SWADE" },
+  { name: "Чародей", requirements: "Закалённый, Мистический дар (магия), Колдовство d6+", detail: "За 1 пункт силы позволяет менять проявление активируемой силы.", source: "SWADE", caution: "Применимость зависит от конкретного мистического дара и правил Ultima Forsan." },
+  { name: "Искусный воин+", requirements: "Легенда, Искусный воин", detail: "+2 к Защите; дополнительная кость урона Дракой становится d10.", source: "SWADE" },
+  { name: "Несгибаемый+", requirements: "Легенда, Несгибаемый, Выносливость d12+", detail: "Герой выдерживает пять ранений перед состоянием при смерти.", source: "SWADE" },
+  { name: "Профессионал+", requirements: "Легенда, Профессионал в выбранном параметре", detail: "Текущий и максимальный уровень выбранного параметра увеличиваются ещё на ступень.", source: "SWADE" },
+  { name: "Профессионал++", requirements: "Легенда, дикая карта, Профессионал+ в выбранном параметре", detail: "При проверках выбранного параметра герой использует d10 как дикий кубик.", source: "SWADE" },
+  { name: "Избранный", requirements: "Новичок, Характер d8+, Драка d6+", detail: "+2 к урону против сверхъестественных существ противоположной природы.", source: "SWADE" },
+  { name: "Ци", requirements: "Ветеран, Мастер боевых искусств+", detail: "Раз за бой позволяет перебросить атаку, заставить врага перебросить удачную атаку или добавить d6 к безоружной Драке.", source: "SWADE" },
+  { name: "Мистический дар (алхимия)", requirements: "Новичок", detail: "Открывает алхимию и сверхъестественный навык Алхимия.", source: "Ultima Forsan" },
+  { name: "Мистический дар (ведьмовство)", requirements: "Новичок", detail: "Открывает ведьмовство и сверхъестественный навык Ведьмовство.", source: "Ultima Forsan" },
+  { name: "Аль-барсарк", requirements: "Новичок, обычно сицилийский норманн, Сила d8+, Характер d6+", detail: "Священная ярость против чумных отродий усиливает ближний бой и Стойкость, но снижает Защиту.", source: "Ultima Forsan" },
+  { name: "Выстрел в голову", requirements: "Новичок, Стрельба d8+, Твёрдая рука", detail: "Вдвое уменьшает штраф за прицельный выстрел в голову мертвецу.", source: "Ultima Forsan" },
+  { name: "Удар в голову", requirements: "Новичок, Сила d6+, Драка d8+, Хладнокровие", detail: "Вдвое уменьшает штраф за прицельный удар в голову мертвеца.", source: "Ultima Forsan" },
+  { name: "Охота за крупной дичью", requirements: "Ветеран, Драка d8+, Знание (Чума) d4+, Смелость, Хладнокровие", detail: "Добавляет модификатор размера крупного чумного отродья и к атаке, и к урону.", source: "Ultima Forsan" },
+  { name: "Путь Ада", requirements: "Закалённый, брат/сестра милосердия, Драка d8+", detail: "Улучшает быструю безоружную атаку: меньшие штрафы к Защите и ударам.", source: "Ultima Forsan" },
+  { name: "Путь Небес", requirements: "Закалённый, брат/сестра милосердия, Драка d8+", detail: "+2 к безоружной Драке для нанесения несмертельного урона.", source: "Ultima Forsan" },
+  { name: "Путь Чистилища", requirements: "Закалённый, брат/сестра милосердия, Драка d8+", detail: "+2 к проверкам толчка.", source: "Ultima Forsan" },
+  { name: "Путь Лимба", requirements: "Герой, Путь Ада, Путь Небес, Путь Чистилища, Ловкость d8+, Характер d10+", detail: "Позволяет становиться незаметным для слабейших мертвецов, пока герой не бежит и не действует активно.", source: "Ultima Forsan" },
+  { name: "Всадник", requirements: "Новичок, Ловкость d6+, Верховая езда d8+", detail: "+2 к Верховой езде и ловкостным уловкам верхом без штрафа за нагрузку.", source: "Ultima Forsan" },
+  { name: "Брат милосердия / сестра чёток", requirements: "Новичок, Характер d6+, Драка d6+", detail: "Даёт Мастера боевых искусств, особое оружие, броню и приют; налагает крупный Пацифизм.", source: "Ultima Forsan" },
+  { name: "Искариот", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d8+, Маскировка d8+", detail: "Мастер двух кинжалов; использует Ловкость для урона и получает фирменное снаряжение.", source: "Ultima Forsan", caution: "Навык Маскировка взят из старой редакции; в SWADE согласуйте замену со ведущим." },
+  { name: "Красная одалиска", requirements: "Новичок, Ловкость d8+, Характер d6+, Драка d6+, Убеждение d6+, Привлекательность", detail: "Сражается двумя саблями и использует Ловкость для урона без штрафа за нагрузку.", source: "Ultima Forsan" },
+  { name: "Ловец мертвецов", requirements: "Новичок, Ловкость d6+, Знание (Чума) d4+", detail: "Снаряжение ловца; без штрафа против мелких целей и +2 против стай и роёв.", source: "Ultima Forsan" },
+  { name: "Могильщик", requirements: "Новичок, Сила d6+, Знание (Чума) d4+", detail: "Стартовое снаряжение, +2 к Знанию (Чума), поиску Чернил и распознаванию заражения.", source: "Ultima Forsan" },
+  { name: "Рыцарь", requirements: "Новичок, Сила d8+, Характер d6+, Выносливость d6+, Верховая езда d8+, Драка d8+", detail: "Обет службы, полное рыцарское снаряжение и приют; специализация зависит от ордена.", source: "Ultima Forsan" },
+  { name: "Тевтонский инквизитор", requirements: "Новичок, Смекалка d6+, Знание (Чума) d6+, Внимание d6+ и навыки расследования", detail: "Даёт Следователя, пистоль и полномочия ордена; требует подчинения начальству.", source: "Ultima Forsan", caution: "Часть требований названа по старой редакции; согласуйте эквиваленты SWADE." },
+  { name: "Чумный доктор", requirements: "Новичок, Знание (Чума) d6+, Лечение d6+", detail: "+2 к Знанию (Чума), медицинское снаряжение и возможность быстро удалить заражённую ткань.", source: "Ultima Forsan" },
+  { name: "Механический протез", requirements: "Новичок, дикая карта, отсутствует часть тела", detail: "Протез отменяет изъян, вызванный утратой соответствующей части тела.", source: "Ultima Forsan" },
+  { name: "Отвлечь мертвеца", requirements: "Новичок, нечистый, Смекалка d6+, Характер d8+", detail: "Встречной проверкой Характера вводит некоторых мертвецов в шок и может отвести их.", source: "Ultima Forsan" },
+  { name: "Полные закрома", requirements: "Новичок, Верховая езда или Судовождение d6+", detail: "Даёт транспорт до 10 000 флоринов и позволяет доставать из него нужные припасы.", source: "Ultima Forsan" },
+  { name: "Сардоническая усмешка", requirements: "Только заражённый Чумой чистый герой", detail: "Дополнительная фишка, бонус против чумных отродий и стойкость перед близкой смертью.", source: "Ultima Forsan", caution: "Получается только после заражения в игре, не покупается при создании." },
+  { name: "Силовая броня", requirements: "Новичок", detail: "Герой начинает с одного элемента комплекта силовой брони.", source: "Ultima Forsan" },
+  { name: "Шут мертвецов", requirements: "Новичок, Смекалка d8+, Характер d6+, Убеждение d6+", detail: "Позволяет применять смекалочную уловку к мертвецам; +2 к таким уловкам против живых.", source: "Ultima Forsan" },
+  { name: "Скверна", requirements: "Герой, человек, Выносливость d8+", detail: "После мучительной болезни герой превращается в нечистого и получает все его особенности.", source: "Ultima Forsan" },
+  { name: "За гранью", requirements: "Легенда, дикая карта, нечистый, Характер d12+", detail: "Нечистый превращается в разумную стрыгу и получает особенности мертвеца без потери разума.", source: "Ultima Forsan" },
+  { name: "Судный день", requirements: "Легенда, Именное оружие, Драка d10+ или Атлетика d10+ или Стрельба d10+", detail: "Именное оружие становится священным и наносит мертвецам дополнительную кость урона.", source: "Ultima Forsan" },
+  { name: "Усовершенствованное устройство", requirements: "Легенда, Мистический дар (безумная наука), Безумная наука d10+", detail: "Одна сила устройства становится надёжнее, легче поддерживается и реже вызывает отдачу.", source: "Ultima Forsan", caution: "Безумная наука из старой редакции адаптируется в кампании; согласуйте механику с ведущим." },
+];
+
+const HINDRANCE_GUIDES: TraitGuide[] = [
+  { name: "Болезненность", severity: "minor", detail: "-2 к Выносливости при сопротивлении Усталости.", source: "SWADE" },
+  { name: "В розыске", severity: "either", detail: "Персонажа разыскивают представители закона; масштаб зависит от тяжести.", source: "SWADE" },
+  { name: "Верный друг", severity: "minor", detail: "У героя есть невероятно надёжный друг или союзник, за которого приходится отвечать.", source: "SWADE" },
+  { name: "Враг", severity: "either", detail: "Героя преследует недоброжелатель; крупный враг опаснее и влиятельнее.", source: "SWADE" },
+  { name: "Героизм", severity: "major", detail: "Герой обязан помогать нуждающимся, даже когда это опасно.", source: "SWADE" },
+  { name: "Длинный язык", severity: "minor", detail: "Часто выдаёт важные сведения не тем людям.", source: "SWADE" },
+  { name: "Дурная привычка", severity: "either", detail: "Зависимость или навязчивая привычка; без неё герой получает Усталость.", source: "SWADE" },
+  { name: "Дурной характер", severity: "minor", detail: "-1 к проверкам Убеждения.", source: "SWADE" },
+  { name: "Жадность", severity: "either", detail: "Слишком озабочен деньгами и собственностью.", source: "SWADE" },
+  { name: "Жажда крови", severity: "major", detail: "Не упускает возможности добить поверженного противника.", source: "SWADE" },
+  { name: "Жестокость", severity: "either", detail: "Готов идти по головам; тяжесть определяет предел бесчеловечности.", source: "SWADE" },
+  { name: "Заблуждение", severity: "either", detail: "Искренне верит в то, что расходится с реальностью.", source: "SWADE" },
+  { name: "Зависть", severity: "either", detail: "Стремится отнять или превзойти то, чем обладают другие.", source: "SWADE" },
+  { name: "Заносчивость", severity: "major", detail: "Всегда доказывает своё превосходство и ищет достойнейшего противника.", source: "SWADE" },
+  { name: "Импульсивность", severity: "major", detail: "Сначала действует, потом думает.", source: "SWADE" },
+  { name: "Клятва", severity: "either", detail: "Принёс клятву и должен следовать ей; крупная клятва определяет жизнь героя.", source: "SWADE" },
+  { name: "Кодекс чести", severity: "major", detail: "Держит слово и ведёт себя достойно даже себе во вред.", source: "SWADE" },
+  { name: "Коротышка", severity: "minor", detail: "Размер и Стойкость уменьшаются на 1.", source: "SWADE" },
+  { name: "Косноязычие", severity: "major", detail: "-1 к Запугиванию, Убеждению и Насмешке.", source: "SWADE" },
+  { name: "Кривые руки", severity: "minor", detail: "-2 при использовании механических устройств.", source: "SWADE" },
+  { name: "Любопытство", severity: "major", detail: "Не может пройти мимо тайны или неизвестности.", source: "SWADE" },
+  { name: "Медлительность", severity: "minor", detail: "В бою тянет две карты действия и обычно оставляет худшую.", source: "SWADE" },
+  { name: "Мстительность", severity: "either", detail: "Не забывает обид; крупная версия толкает на серьёзное возмездие.", source: "SWADE" },
+  { name: "Мягкость", severity: "minor", detail: "-2 к проверкам Запугивания.", source: "SWADE" },
+  { name: "Невезение", severity: "major", detail: "На 1 фишку меньше в начале каждой встречи.", source: "SWADE" },
+  { name: "Неграмотность", severity: "minor", detail: "Не умеет читать и писать.", source: "SWADE", caution: "В Ultima Forsan герои по умолчанию грамотны; этот изъян отменяет правило мира." },
+  { name: "Немота", severity: "major", detail: "Не способен разговаривать.", source: "SWADE" },
+  { name: "Неуклюжесть", severity: "major", detail: "-2 к Атлетике и Скрытности.", source: "SWADE" },
+  { name: "Неумение плавать", severity: "minor", detail: "-2 к плаванию; движение в воде стоит втрое дороже.", source: "SWADE" },
+  { name: "Обидчивость", severity: "either", detail: "Хуже сопротивляется Насмешкам: -2 или -4 по тяжести.", source: "SWADE" },
+  { name: "Обязательства", severity: "either", detail: "Должен посвящать обязанностям значительную часть недели.", source: "SWADE" },
+  { name: "Одержимость идеей", severity: "either", detail: "Подчиняет решения великой цели; крупная версия почти всепоглощающая.", source: "SWADE" },
+  { name: "Отсутствие глаза", severity: "major", detail: "-2 к действиям, зависящим от зрения, на средней и дальней дистанции.", source: "SWADE" },
+  { name: "Отсутствие руки", severity: "major", detail: "-4 к задачам, для которых нужны обе руки.", source: "SWADE" },
+  { name: "Паранойя", severity: "either", detail: "Никому не доверяет; при крупной версии помощь герою затруднена.", source: "SWADE" },
+  { name: "Пацифизм", severity: "either", detail: "Мелкий: дерётся лишь для самозащиты; крупный: не дерётся вовсе.", source: "SWADE" },
+  { name: "Перестраховщик", severity: "minor", detail: "Излишне осторожен и склонен слишком долго планировать.", source: "SWADE" },
+  { name: "Плохое зрение", severity: "either", detail: "-1 или -2 к зрительным проверкам; очки обычно отменяют штраф.", source: "SWADE" },
+  { name: "Позор", severity: "either", detail: "В прошлом героя есть постыдный поступок или пятно на репутации.", source: "SWADE" },
+  { name: "Полнота", severity: "minor", detail: "+1 к Размеру, -1 к Шагу, бег d4; Сила ниже для требований нагрузки.", source: "SWADE" },
+  { name: "Причуда", severity: "minor", detail: "Безобидная или неприятная странность поведения.", source: "SWADE" },
+  { name: "Рассеянность", severity: "major", detail: "-1 к Осведомлённости и Вниманию.", source: "SWADE" },
+  { name: "Самопожертвование", severity: "minor", detail: "Готов рисковать собой ради великой цели.", source: "SWADE" },
+  { name: "Самоуверенность", severity: "major", detail: "Уверен, что способен справиться с любой угрозой.", source: "SWADE" },
+  { name: "Секрет", severity: "either", detail: "Скрывает опасную правду; тяжесть определяет последствия разоблачения.", source: "SWADE" },
+  { name: "Слепота", severity: "major", detail: "-6 к действиям, требующим зрения; взамен даётся дополнительная черта.", source: "SWADE" },
+  { name: "Старость", severity: "major", detail: "Медленнее и слабее физически, но получает дополнительные умственные навыки.", source: "SWADE" },
+  { name: "Транжира", severity: "minor", detail: "Половина стартовых средств и постоянная склонность тратить деньги.", source: "SWADE" },
+  { name: "Трусость", severity: "major", detail: "-2 к сопротивлению страху и Запугиванию.", source: "SWADE" },
+  { name: "Тугоухость", severity: "either", detail: "-4 к слуховому Вниманию; при крупной версии герой полностью глух.", source: "SWADE" },
+  { name: "Упрямство", severity: "minor", detail: "Не признаёт ошибок и до последнего стоит на своём.", source: "SWADE" },
+  { name: "Уродство", severity: "either", detail: "-1 или -2 к Убеждению, когда внешность имеет значение.", source: "SWADE" },
+  { name: "Фобия", severity: "either", detail: "-1 или -2 ко всем проверкам рядом с объектом страха.", source: "SWADE" },
+  { name: "Фома неверующий", severity: "minor", detail: "Не верит в сверхъестественное и потому опасно недооценивает его.", source: "SWADE" },
+  { name: "Хромота", severity: "either", detail: "Снижает Шаг и бег; крупная версия также даёт -2 к Атлетике.", source: "SWADE" },
+  { name: "Чужак", severity: "either", detail: "-2 к Убеждению; при крупной версии нет гражданских прав.", source: "SWADE" },
+  { name: "Юность", severity: "either", detail: "Меньше пунктов характеристик и навыков, но больше фишек.", source: "SWADE" },
+  { name: "Слабое нутро", severity: "major", detail: "При каждом столкновении с ужасами Чумы проходит проверку храбрости.", source: "Ultima Forsan" },
+];
+
+function requiredRank(guide: TraitGuide): Rank {
+  const rankClause = (guide.requirements || "")
+    .split(",", 1)[0]
+    .trim()
+    .toLocaleLowerCase("ru");
+  if (rankClause.startsWith("легенд")) return "Легенда";
+  if (rankClause.startsWith("герой")) return "Герой";
+  if (rankClause.startsWith("ветеран")) return "Ветеран";
+  if (rankClause.startsWith("закалён")) return "Закалённый";
+  return "Новичок";
+}
+
+function rankAllows(currentRank: string, guide: TraitGuide) {
+  const current = Math.max(0, RANKS.indexOf(currentRank as Rank));
+  return current >= RANKS.indexOf(requiredRank(guide));
+}
+
+const ATTRIBUTE_REQUIREMENTS: Record<string, AttributeKey> = {
+  "ловкость": "agility",
+  "смекалка": "smarts",
+  "характер": "spirit",
+  "сила": "strength",
+  "выносливость": "vigor",
+};
+
+function edgeRequirementIssues(guide: TraitGuide, rank: Rank, character: Character, skills: Skill[]): string[] {
+  const requirements = guide.requirements || "";
+  const normalized = requirements.toLocaleLowerCase("ru");
+  const issues: string[] = [];
+  if (!rankAllows(rank, guide)) issues.push(`Нужен ранг «${requiredRank(guide)}»`);
+
+  for (const match of normalized.matchAll(/(ловкость|смекалка|характер|сила|выносливость) d(4|6|8|10|12)\+/g)) {
+    const key = ATTRIBUTE_REQUIREMENTS[match[1]];
+    const needed = Number(match[2]);
+    if (character.attributes[key] < needed) issues.push(`${match[1][0].toUpperCase()}${match[1].slice(1)} должна быть d${needed}+`);
+  }
+
+  const skillByName = new Map(skills.map((skill) => [skill.name.toLocaleLowerCase("ru"), skill]));
+  for (const segment of requirements.split(",").map((item) => item.trim())) {
+    const lowerSegment = segment.toLocaleLowerCase("ru");
+    if (lowerSegment.includes(" или ")) {
+      const defaultDie = Number(lowerSegment.match(/d(4|6|8|10|12)\+/)?.[1] || 0);
+      const options = lowerSegment.split(/\s+или\s+/).map((option) => {
+        const needed = Number(option.match(/d(4|6|8|10|12)\+/)?.[1] || defaultDie);
+        const name = option.replace(/d(4|6|8|10|12)\+/g, "").trim();
+        return { skill: skillByName.get(name), needed };
+      }).filter((option) => option.skill && option.needed);
+      if (options.length >= 2 && !options.some((option) => (option.skill?.level || 0) >= option.needed)) {
+        issues.push(`${options.map((option) => option.skill?.name).join(" или ")} должны быть d${defaultDie}+`);
+      }
+      continue;
+    }
+    for (const skill of skills) {
+      const escaped = skill.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = lowerSegment.match(new RegExp(`^${escaped.toLocaleLowerCase("ru")} d(4|6|8|10|12)\\+`));
+      if (match && skill.level < Number(match[1])) issues.push(`${skill.name} должен быть d${match[1]}+`);
+    }
+  }
+
+  const owned = character.edges.map((edge) => edge.name.trim().toLocaleLowerCase("ru"));
+  const segments = requirements.split(",").map((segment) => segment.trim()).slice(1);
+  for (const segment of segments) {
+    const lower = segment.toLocaleLowerCase("ru");
+    if (/d(4|6|8|10|12)\+/.test(lower) || lower.includes("или") || lower.includes("дикая карта") || lower.includes("человек") || lower.includes("нечист") || lower.includes("см. описание") || lower.includes("отсутствует") || lower.includes("навык") || lower.includes("параметр") || lower.includes("сицилий")) continue;
+    if (lower === "мистический дар") {
+      if (!owned.some((name) => name.startsWith("мистический дар"))) issues.push("Нужна черта «Мистический дар»");
+      continue;
+    }
+    const prerequisite = EDGE_GUIDES
+      .filter((candidate) => candidate.name !== guide.name)
+      .sort((a, b) => b.name.length - a.name.length)
+      .find((candidate) => lower.startsWith(candidate.name.toLocaleLowerCase("ru")));
+    if (prerequisite && !owned.includes(prerequisite.name.toLocaleLowerCase("ru"))) issues.push(`Нужна черта «${prerequisite.name}»`);
+  }
+
+  if (normalized.includes("нечист") && character.purity !== "Нечистый") issues.push("Герой должен быть нечистым");
+  if (normalized.includes("чистый герой") && character.purity !== "Чистый") issues.push("Герой должен быть чистым");
+  if (normalized.includes("заражён") && !character.infected) issues.push("Герой должен быть заражён Чумой");
+  return [...new Set(issues)];
+}
 
 const BASE_SKILLS: Omit<Skill, "level">[] = [
   { id: "athletics", name: "Атлетика", attribute: "agility", core: true },
@@ -144,33 +625,44 @@ const blankWeapon = (): Weapon => ({
   damage: "",
   ap: "",
   ammo: "",
+  price: 0,
+  weight: 0,
+  purchased: false,
 });
 
 const createInitialSkills = (): Skill[] =>
   BASE_SKILLS.map((skill) => ({ ...skill, level: skill.core ? 4 : 0 }));
 
 const createInitialCharacter = (): Character => ({
-  rulesMode: "swade",
   name: "",
   player: "",
   archetype: "",
-  rank: "Новичок",
   advances: "0",
+  edgeAdvances: "0",
+  skillAdvancePoints: 0,
+  attributeAdvancePoints: 0,
+  attributeRaiseRanks: [],
+  retiredHindrancePoints: 0,
   origin: "",
   age: "",
   purity: "Чистый",
   appearance: "",
+  portrait: "",
+  portraitX: 50,
+  portraitY: 50,
+  portraitZoom: 100,
+  creationLocked: false,
   attributes: { agility: 4, smarts: 4, spirit: 4, strength: 4, vigor: 4 },
   armor: 0,
   size: 0,
   pace: 6,
   runningDie: 6,
   bennies: 3,
-  charisma: 0,
   languages: "",
-  edges: [blankEdge(), blankEdge(), blankEdge()],
+  edges: [blankEdge()],
   hindrances: [blankHindrance(), blankHindrance(), blankHindrance()],
   weapons: [blankWeapon(), blankWeapon(), blankWeapon()],
+  inventory: [],
   gear: "",
   florins: "500",
   homeland: "",
@@ -181,7 +673,152 @@ const createInitialCharacter = (): Character => ({
   bonds: "",
   notes: "",
   wildArcana: "",
+  wounds: 0,
+  fatigue: 0,
+  shaken: false,
+  infected: false,
+  sessionBennies: 3,
+  plagueExposure: 0,
+  ammoSpent: {},
+  printPortrait: true,
+  printDiceValues: true,
+  printExtraNotesPage: false,
 });
+
+function restoreCharacter(value?: Partial<Character>): Character {
+  const initial = createInitialCharacter();
+  const legacy = (value || {}) as Partial<Character> & {
+    rank?: unknown;
+    rulesMode?: unknown;
+    charisma?: unknown;
+  };
+  const { rank: _rank, rulesMode: _rulesMode, charisma: _charisma, ...rest } = legacy;
+  return {
+    ...initial,
+    ...rest,
+    attributes: { ...initial.attributes, ...(rest.attributes || {}) },
+    skillAdvancePoints: Math.max(0, safeNumber(rest.skillAdvancePoints)),
+    attributeAdvancePoints: Math.max(0, safeNumber(rest.attributeAdvancePoints)),
+    attributeRaiseRanks: Array.isArray(rest.attributeRaiseRanks) ? rest.attributeRaiseRanks : [],
+    retiredHindrancePoints: Math.max(0, safeNumber(rest.retiredHindrancePoints)),
+    inventory: Array.isArray(rest.inventory) ? rest.inventory : [],
+    portraitX: Math.min(100, Math.max(0, safeNumber(rest.portraitX, 50))),
+    portraitY: Math.min(100, Math.max(0, safeNumber(rest.portraitY, 50))),
+    portraitZoom: Math.min(180, Math.max(100, safeNumber(rest.portraitZoom, 100))),
+    ammoSpent: rest.ammoSpent && typeof rest.ammoSpent === "object" ? rest.ammoSpent : {},
+    edges: rest.edges?.length
+      ? [
+          ...rest.edges.filter((entry) => entry.name.trim() || entry.note.trim()),
+          ...(rest.edges.some((entry) => !entry.name.trim() && !entry.note.trim()) ? [blankEdge()] : []),
+        ]
+      : initial.edges,
+    hindrances: rest.hindrances?.length ? rest.hindrances : initial.hindrances,
+    weapons: rest.weapons?.length ? rest.weapons : initial.weapons,
+  };
+}
+
+function restoreSkills(value?: Skill[]): Skill[] {
+  if (!value?.length) return createInitialSkills();
+  const savedById = new Map(value.map((skill) => [skill.id, skill]));
+  const standard = createInitialSkills().map((skill) => ({
+    ...skill,
+    ...(savedById.get(skill.id) || {}),
+    core: skill.core,
+  }));
+  const custom = value.filter((skill) => skill.id.startsWith("custom-"));
+  return [...standard, ...custom];
+}
+
+function copyData<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function captureAdvanceState(character: Character, skills: Skill[]): AdvanceSnapshot {
+  return copyData({
+    advances: character.advances,
+    edgeAdvances: character.edgeAdvances,
+    skillAdvancePoints: character.skillAdvancePoints,
+    attributeAdvancePoints: character.attributeAdvancePoints,
+    attributeRaiseRanks: character.attributeRaiseRanks,
+    retiredHindrancePoints: character.retiredHindrancePoints,
+    attributes: character.attributes,
+    edges: character.edges,
+    hindrances: character.hindrances,
+    skills,
+  });
+}
+
+function restoreAdvanceHistory(value: unknown): AdvanceRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is AdvanceRecord => {
+    if (!item || typeof item !== "object") return false;
+    const record = item as Partial<AdvanceRecord>;
+    const before = record.before as Partial<AdvanceSnapshot> | undefined;
+    return Boolean(
+      record.id && Number.isFinite(record.number) && record.rank && record.type && record.summary &&
+      record.createdAt && before && typeof before.advances === "string" &&
+      Array.isArray(before.attributeRaiseRanks) && Array.isArray(before.edges) &&
+      Array.isArray(before.hindrances) && Array.isArray(before.skills) && before.attributes,
+    );
+  });
+}
+
+function preparePortrait(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) return Promise.reject(new Error("Выберите файл изображения."));
+  if (file.size > 12 * 1024 * 1024) return Promise.reject(new Error("Файл слишком большой. Максимальный размер — 12 МБ."));
+
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const maxWidth = 640;
+        const maxHeight = 900;
+        const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Браузер не смог обработать изображение.");
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        let quality = .82;
+        let result = canvas.toDataURL("image/jpeg", quality);
+        while (result.length > 420_000 && quality > .5) {
+          quality -= .08;
+          result = canvas.toDataURL("image/jpeg", quality);
+        }
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Не удалось прочитать изображение. Попробуйте JPG, PNG или WebP."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function makeHeroRecord(
+  character = createInitialCharacter(),
+  skills = createInitialSkills(),
+  advanceHistory: AdvanceRecord[] = [],
+): SavedHero {
+  const timestamp = new Date().toISOString();
+  return {
+    id: `hero-${makeId()}`,
+    character: copyData(character),
+    skills: copyData(skills),
+    advanceHistory: copyData(advanceHistory),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
 
 const DEMO_CHARACTER: Partial<Character> = {
   name: "Беатриче Маласпина",
@@ -217,10 +854,28 @@ function safeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(result) ? result : fallback;
 }
 
-function skillCost(skill: Skill, attributes: Character["attributes"], mode: RulesMode) {
+function rankFromAdvances(value: unknown): Rank {
+  const advances = Math.max(0, Math.floor(safeNumber(value)));
+  if (advances >= 16) return "Легенда";
+  if (advances >= 12) return "Герой";
+  if (advances >= 8) return "Ветеран";
+  if (advances >= 4) return "Закалённый";
+  return "Новичок";
+}
+
+function nextRankAt(rank: Rank) {
+  return ({ Новичок: 4, Закалённый: 8, Ветеран: 12, Герой: 16, Легенда: null } as const)[rank];
+}
+
+function nextDie(value: Die): Die | null {
+  const index = DIE_OPTIONS.indexOf(value);
+  return index >= 0 && index < DIE_OPTIONS.length - 1 ? DIE_OPTIONS[index + 1] : null;
+}
+
+function skillCost(skill: Skill, attributes: Character["attributes"]) {
   const targetIndex = DIE_OPTIONS.indexOf(skill.level);
   if (targetIndex <= 0) return 0;
-  const freeIndex = mode === "swade" && skill.core ? 1 : 0;
+  const freeIndex = skill.core ? 1 : 0;
   let cost = 0;
   for (let index = freeIndex + 1; index <= targetIndex; index += 1) {
     const targetDie = DIE_OPTIONS[index];
@@ -333,35 +988,263 @@ function PipTrack({ count, label }: { count: number; label: string }) {
   );
 }
 
+function AttributeDie({ die, current }: { die: Die; current: boolean }) {
+  return (
+    <span
+      className={`attribute-die die-d${die}${current ? " is-current" : ""}`}
+      aria-label={`${dieLabel(die)}${current ? ", текущая характеристика" : ""}`}
+    >
+      <i>{die}</i>
+    </span>
+  );
+}
+
+function TraitGuideInput({
+  kind,
+  entry,
+  rank,
+  onChange,
+  excludeNames = [],
+  disableFutureRank = false,
+  requirementIssues,
+}: {
+  kind: "edge" | "hindrance";
+  entry: TraitEntry;
+  rank: string;
+  onChange: (patch: Partial<TraitEntry>) => void;
+  excludeNames?: string[];
+  disableFutureRank?: boolean;
+  requirementIssues?: (guide: TraitGuide) => string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const excluded = new Set(excludeNames.map((name) => name.trim().toLocaleLowerCase("ru")));
+  const guides = (kind === "edge" ? EDGE_GUIDES : HINDRANCE_GUIDES).filter(
+    (guide) => !excluded.has(guide.name.toLocaleLowerCase("ru")),
+  );
+  const normalized = entry.name.trim().toLocaleLowerCase("ru");
+  const exact = guides.find((guide) => guide.name.toLocaleLowerCase("ru") === normalized);
+  const suggestions = (normalized
+    ? guides.filter((guide) => guide.name.toLocaleLowerCase("ru").includes(normalized))
+    : guides
+  ).sort((left, right) => {
+    if (kind === "hindrance") return left.name.localeCompare(right.name, "ru");
+    const availability = Number(rankAllows(rank, right)) - Number(rankAllows(rank, left));
+    if (availability) return availability;
+    const rankDifference = RANKS.indexOf(requiredRank(left)) - RANKS.indexOf(requiredRank(right));
+    return rankDifference || left.name.localeCompare(right.name, "ru");
+  });
+  const exactRankAllowed = kind === "hindrance" || !exact || rankAllows(rank, exact);
+
+  const choose = (guide: TraitGuide) => {
+    onChange({
+      name: guide.name,
+      note: guide.detail,
+      ...(kind === "hindrance" && guide.severity !== "either"
+        ? { severity: guide.severity }
+        : {}),
+    });
+    setOpen(false);
+  };
+
+  return (
+    <div className="guide-field">
+      <input
+        aria-label={kind === "edge" ? "Черта" : "Изъян"}
+        value={entry.name}
+        placeholder={kind === "edge" ? "Начните вводить черту" : "Начните вводить изъян"}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => {
+          onChange({ name: event.target.value });
+          setOpen(true);
+        }}
+      />
+      {open && suggestions.length > 0 && (
+        <div className="guide-menu" role="listbox" aria-label="Подсказки справочника">
+          <div className="guide-menu-summary">
+            <span>{normalized ? `Найдено: ${suggestions.length}` : `В справочнике: ${suggestions.length}`}</span>
+            {kind === "edge" && <b>Ранг героя: {rank}</b>}
+          </div>
+          {suggestions.map((guide) => {
+            const unavailable = kind === "edge" && !rankAllows(rank, guide);
+            const issues = requirementIssues?.(guide) || [];
+            const blocked = disableFutureRank && (unavailable || issues.length > 0);
+            return (
+            <button className={unavailable || issues.length ? "future-rank" : ""} disabled={blocked} key={guide.name} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(guide)}>
+              <span>
+                <strong>{guide.name}</strong>
+                <em>{guide.source}</em>
+                {unavailable && <i>с ранга «{requiredRank(guide)}»</i>}
+              </span>
+              <small>{guide.requirements || (guide.severity === "major" ? "Крупный" : guide.severity === "minor" ? "Мелкий" : "Мелкий или крупный")}</small>
+              <p>{guide.detail}</p>
+              {issues.length > 0 && <small className="guide-issues">Не выполнено: {issues.join("; ")}</small>}
+            </button>
+          );})}
+        </div>
+      )}
+      {exact && (
+        <div className={`guide-hint ${!exactRankAllowed ? "rank-mismatch" : ""}`}>
+          <span><b>{exact.source}</b>{exact.requirements && <>Требования: {exact.requirements}</>}</span>
+          <p>{exact.detail}</p>
+          {!exactRankAllowed && <small className="rank-warning">Текущий ранг «{rank}» недостаточен. Черта доступна с ранга «{requiredRank(exact)}».</small>}
+          {exact.caution && <small>{exact.caution}</small>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeaponGuideInput({ weapon, onChange }: { weapon: Weapon; onChange: (patch: Partial<Weapon>) => void }) {
+  const [open, setOpen] = useState(false);
+  const normalized = weapon.name.trim().toLocaleLowerCase("ru");
+  const suggestions = (normalized
+    ? WEAPON_GUIDES.filter((guide) => guide.name.toLocaleLowerCase("ru").includes(normalized))
+    : WEAPON_GUIDES
+  ).sort((left, right) => left.category.localeCompare(right.category, "ru") || left.name.localeCompare(right.name, "ru"));
+
+  const choose = (guide: WeaponGuide) => {
+    const purchase = WEAPON_PURCHASE_DATA[guide.name];
+    onChange({ name: guide.name, range: guide.range, damage: guide.damage, ap: guide.ap, ammo: guide.ammo, price: purchase?.price || 0, weight: purchase?.weight || 0, purchased: false });
+    setOpen(false);
+  };
+
+  return (
+    <div className="guide-field weapon-guide-field">
+      <input
+        aria-label="Название оружия"
+        value={weapon.name}
+        placeholder="Начните вводить"
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => {
+          onChange({ name: event.target.value });
+          setOpen(true);
+        }}
+      />
+      {open && suggestions.length > 0 && (
+        <div className="guide-menu weapon-guide-menu" role="listbox" aria-label="Варианты оружия Ultima Forsan">
+          <div className="guide-menu-summary"><span>{normalized ? `Найдено: ${suggestions.length}` : `В справочнике: ${suggestions.length}`}</span><b>Ultima Forsan</b></div>
+          {suggestions.map((guide) => (
+            <button key={guide.name} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(guide)}>
+              <span><strong>{guide.name}</strong><em>{guide.category}</em></span>
+              <small>{guide.range} · {guide.damage}{guide.ap !== "-" ? ` · ББ ${guide.ap}` : ""}</small>
+              <p>{guide.detail}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [character, setCharacter] = useState<Character>(() => createInitialCharacter());
   const [skills, setSkills] = useState<Skill[]>(() => createInitialSkills());
+  const [advanceHistory, setAdvanceHistory] = useState<AdvanceRecord[]>([]);
+  const [library, setLibrary] = useState<HeroLibrary | null>(null);
+  const [activeHeroId, setActiveHeroId] = useState("");
+  const [savedAt, setSavedAt] = useState("");
   const [mobileView, setMobileView] = useState<"form" | "preview">("form");
   const [printRequested, setPrintRequested] = useState(false);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [advanceType, setAdvanceType] = useState<AdvanceType>("edge");
+  const [advancePrimary, setAdvancePrimary] = useState("");
+  const [advanceSecondary, setAdvanceSecondary] = useState("");
+  const [advanceError, setAdvanceError] = useState("");
+  const [portraitError, setPortraitError] = useState("");
   const hydrated = useRef(false);
+  const portraitInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ultima-forsan-character-v1");
-      if (saved) {
-        const parsed = JSON.parse(saved) as { character?: Character; skills?: Skill[] };
-        if (parsed.character) setCharacter(parsed.character);
-        if (parsed.skills) setSkills(parsed.skills);
+      const storedLibrary = localStorage.getItem(LIBRARY_STORAGE_KEY);
+      let restoredLibrary: HeroLibrary | null = null;
+
+      if (storedLibrary) {
+        const parsed = JSON.parse(storedLibrary) as Partial<HeroLibrary>;
+        if (Array.isArray(parsed.heroes) && parsed.heroes.length > 0) {
+          const heroes = parsed.heroes.map((hero) => ({
+            ...hero,
+            id: hero.id || `hero-${makeId()}`,
+            character: restoreCharacter(hero.character),
+            skills: restoreSkills(hero.skills),
+            advanceHistory: restoreAdvanceHistory(hero.advanceHistory),
+            createdAt: hero.createdAt || new Date().toISOString(),
+            updatedAt: hero.updatedAt || new Date().toISOString(),
+          }));
+          const activeHeroId = heroes.some((hero) => hero.id === parsed.activeHeroId)
+            ? String(parsed.activeHeroId)
+            : heroes[0].id;
+          restoredLibrary = { version: 2, activeHeroId, heroes };
+        }
       }
+
+      if (!restoredLibrary) {
+        const legacyDraft = localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacyDraft) {
+          const parsed = JSON.parse(legacyDraft) as { character?: Character; skills?: Skill[] };
+          const migrated = makeHeroRecord(
+            restoreCharacter(parsed.character),
+            restoreSkills(parsed.skills),
+          );
+          restoredLibrary = { version: 2, activeHeroId: migrated.id, heroes: [migrated] };
+        }
+      }
+
+      if (!restoredLibrary) {
+        const firstHero = makeHeroRecord();
+        restoredLibrary = { version: 2, activeHeroId: firstHero.id, heroes: [firstHero] };
+      }
+
+      const active = restoredLibrary.heroes.find(
+        (hero) => hero.id === restoredLibrary?.activeHeroId,
+      ) || restoredLibrary.heroes[0];
+      setLibrary(restoredLibrary);
+      setActiveHeroId(active.id);
+      setCharacter(copyData(active.character));
+      setSkills(copyData(active.skills));
+      setAdvanceHistory(copyData(active.advanceHistory));
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(restoredLibrary));
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
-      // A damaged draft should never prevent the generator from opening.
+      const firstHero = makeHeroRecord();
+      const fallback: HeroLibrary = { version: 2, activeHeroId: firstHero.id, heroes: [firstHero] };
+      setLibrary(fallback);
+      setActiveHeroId(firstHero.id);
     } finally {
       hydrated.current = true;
     }
   }, []);
 
   useEffect(() => {
-    if (!hydrated.current) return;
-    localStorage.setItem(
-      "ultima-forsan-character-v1",
-      JSON.stringify({ character, skills }),
-    );
-  }, [character, skills]);
+    if (!hydrated.current || !activeHeroId) return;
+    const timestamp = new Date().toISOString();
+    setLibrary((current) => {
+      if (!current) return current;
+      const next: HeroLibrary = {
+        ...current,
+        activeHeroId,
+        heroes: current.heroes.map((hero) =>
+          hero.id === activeHeroId
+            ? {
+                ...hero,
+                character: copyData(character),
+                skills: copyData(skills),
+                advanceHistory: copyData(advanceHistory),
+                updatedAt: timestamp,
+              }
+            : hero,
+        ),
+      };
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+    setSavedAt(timestamp);
+  }, [character, skills, advanceHistory, activeHeroId]);
 
   useEffect(() => {
     if (!printRequested) return;
@@ -376,8 +1259,95 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [printRequested, character.name]);
 
+  useEffect(() => {
+    if (!advanceOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAdvanceOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [advanceOpen]);
+
   const update = <K extends keyof Character>(key: K, value: Character[K]) => {
     setCharacter((current) => ({ ...current, [key]: value }));
+  };
+
+  const uploadPortrait = async (file?: File) => {
+    if (!file) return;
+    setPortraitError("");
+    try {
+      update("portrait", await preparePortrait(file));
+    } catch (error) {
+      setPortraitError(error instanceof Error ? error.message : "Не удалось загрузить портрет.");
+    } finally {
+      if (portraitInput.current) portraitInput.current.value = "";
+    }
+  };
+
+  const purchaseEquipment = (guideId: string) => {
+    const guide = EQUIPMENT_GUIDES.find((item) => item.id === guideId);
+    if (!guide) return;
+    const florins = safeNumber(character.florins);
+    if (florins < guide.price) return window.alert(`Не хватает ${guide.price - florins} флоринов.`);
+    setCharacter((current) => {
+      const existing = current.inventory.find((item) => item.id === guide.id);
+      return {
+        ...current,
+        florins: String(Math.max(0, safeNumber(current.florins) - guide.price)),
+        inventory: existing
+          ? current.inventory.map((item) => item.id === guide.id ? { ...item, quantity: item.quantity + 1 } : item)
+          : [...current.inventory, { ...guide, quantity: 1, equipped: guide.category === "Доспех" || guide.category === "Щит" }],
+      };
+    });
+  };
+
+  const sellEquipment = (id: string) => {
+    setCharacter((current) => {
+      const item = current.inventory.find((entry) => entry.id === id);
+      if (!item) return current;
+      return {
+        ...current,
+        florins: String(safeNumber(current.florins) + item.price),
+        inventory: item.quantity > 1
+          ? current.inventory.map((entry) => entry.id === id ? { ...entry, quantity: entry.quantity - 1 } : entry)
+          : current.inventory.filter((entry) => entry.id !== id),
+      };
+    });
+  };
+
+  const setEquipmentWorn = (id: string, equipped: boolean) => {
+    setCharacter((current) => ({
+      ...current,
+      inventory: current.inventory.map((item) => item.id === id ? { ...item, equipped } : item),
+    }));
+  };
+
+  const purchaseWeapon = (id: string) => {
+    setCharacter((current) => {
+      const weapon = current.weapons.find((item) => item.id === id);
+      const price = weapon?.price || 0;
+      if (!weapon || !price || weapon.purchased || safeNumber(current.florins) < price) return current;
+      return { ...current, florins: String(safeNumber(current.florins) - price), weapons: current.weapons.map((item) => item.id === id ? { ...item, purchased: true } : item) };
+    });
+  };
+
+  const returnWeapon = (id: string) => {
+    setCharacter((current) => {
+      const weapon = current.weapons.find((item) => item.id === id);
+      if (!weapon?.purchased) return current;
+      return { ...current, florins: String(safeNumber(current.florins) + (weapon.price || 0)), weapons: current.weapons.map((item) => item.id === id ? { ...item, purchased: false } : item) };
+    });
+  };
+
+  const lockCreation = () => {
+    if (!creationReady) return window.alert("Сначала исправьте превышение пунктов характеристик, навыков или черт.");
+    if (!window.confirm("Завершить создание? Характеристики, навыки, черты и изъяны дальше будут изменяться через повышения.")) return;
+    update("creationLocked", true);
   };
 
   const attributePoints = useMemo(
@@ -388,31 +1358,52 @@ export default function Home() {
       }, 0),
     [character.attributes, character.purity],
   );
+  const creationAttributePoints = Math.max(0, attributePoints - character.attributeAdvancePoints);
 
   const skillPoints = useMemo(
     () =>
       skills.reduce(
-        (total, skill) => total + skillCost(skill, character.attributes, character.rulesMode),
+        (total, skill) => total + skillCost(skill, character.attributes),
         0,
       ),
-    [skills, character.attributes, character.rulesMode],
+    [skills, character.attributes],
   );
+  const creationSkillPoints = Math.max(0, skillPoints - character.skillAdvancePoints);
 
-  const skillBudget = character.rulesMode === "swade" ? 12 : 15;
+  const skillBudget = 12;
   const hindrancePoints = character.hindrances.reduce(
     (total, item) => total + (item.name ? (item.severity === "major" ? 2 : 1) : 0),
     0,
   );
+  const creditedHindrancePoints = Math.min(4, hindrancePoints + character.retiredHindrancePoints);
+  const hindranceEdgeSlots = Math.floor(creditedHindrancePoints / 2);
+  const advances = Math.max(0, safeNumber(character.advances));
+  const currentRank = rankFromAdvances(advances);
+  const nextRankThreshold = nextRankAt(currentRank);
+  const edgeAdvances = Math.min(advances, Math.max(0, safeNumber(character.edgeAdvances)));
+  const baseEdgeSlots = character.purity === "Чистый" ? 1 : 0;
+  const edgeLimit = baseEdgeSlots + hindranceEdgeSlots + edgeAdvances;
+  const chosenEdgeCount = character.edges.filter((item) => item.name.trim()).length;
+  const addableEdgeRows = Math.max(0, edgeLimit - character.edges.length);
   const fighting = skills.find((skill) => skill.id === "fighting")?.level ?? 0;
-  const parry = fighting === 0 ? 2 : 2 + halfDie(fighting);
+  const equippedArmor = character.inventory.filter((item) => item.equipped && item.category === "Доспех");
+  const equippedShield = character.inventory.filter((item) => item.equipped && item.category === "Щит").sort((a, b) => (b.parry || 0) - (a.parry || 0))[0];
+  const torsoArmor = Math.max(0, ...equippedArmor.filter((item) => item.detail.toLocaleLowerCase("ru").includes("торс")).map((item) => item.armor || 0));
+  const effectiveArmor = torsoArmor || safeNumber(character.armor);
+  const parry = (fighting === 0 ? 2 : 2 + halfDie(fighting)) + (equippedShield?.parry || 0);
   const toughness =
-    2 + halfDie(character.attributes.vigor) + safeNumber(character.armor) + safeNumber(character.size);
+    2 + halfDie(character.attributes.vigor) + effectiveArmor + safeNumber(character.size);
+  const inventoryWeight = character.inventory.reduce((total, item) => total + item.weight * item.quantity, 0) + character.weapons.reduce((total, weapon) => total + (weapon.purchased ? weapon.weight || 0 : 0), 0);
+  const loadLimit = Math.max(10, (character.attributes.strength / 2 - 1) * 10);
+  const encumbered = inventoryWeight > loadLimit;
   const languageAllowance = 1 + Math.floor(character.attributes.smarts / 2);
   const languageCount = character.languages
     .split(/[,;\n]/)
     .map((item) => item.trim())
     .filter(Boolean).length;
   const printSkills = skills.filter((skill) => skill.level > 0).slice(0, 24);
+  const availableEdgeCount = EDGE_GUIDES.filter((guide) => rankAllows(currentRank, guide)).length;
+  const creationReady = creationAttributePoints <= 5 && creationSkillPoints <= skillBudget && chosenEdgeCount <= edgeLimit;
 
   const completion = [
     character.name,
@@ -421,14 +1412,129 @@ export default function Home() {
     character.languages,
     character.goal,
     character.fear,
-    attributePoints <= 5 ? "ok" : "",
-    skillPoints <= skillBudget ? "ok" : "",
+    creationAttributePoints <= 5 ? "ok" : "",
+    creationSkillPoints <= skillBudget ? "ok" : "",
   ].filter(Boolean).length;
 
   const updateSkill = (id: string, patch: Partial<Skill>) => {
     setSkills((current) =>
       current.map((skill) => (skill.id === id ? { ...skill, ...patch } : skill)),
     );
+  };
+
+  const openAdvance = () => {
+    setAdvanceType("edge");
+    setAdvancePrimary("");
+    setAdvanceSecondary("");
+    setAdvanceError("");
+    setAdvanceOpen(true);
+  };
+
+  const applyAdvance = () => {
+    const newAdvanceCount = Math.floor(advances) + 1;
+    const newRank = rankFromAdvances(newAdvanceCount);
+    const before = captureAdvanceState(character, skills);
+    setAdvanceError("");
+
+    const recordAdvance = (summary: string) => {
+      setAdvanceHistory((current) => [...current, {
+        id: `advance-${makeId()}`,
+        number: newAdvanceCount,
+        rank: newRank,
+        type: advanceType,
+        summary,
+        createdAt: new Date().toISOString(),
+        before,
+      }]);
+    };
+
+    if (advanceType === "edge") {
+      const guide = EDGE_GUIDES.find((item) => item.name === advancePrimary);
+      if (!guide) return setAdvanceError("Выберите черту.");
+      const issues = edgeRequirementIssues(guide, newRank, character, skills);
+      if (issues.length) return setAdvanceError(`Не выполнены требования: ${issues.join("; ")}.`);
+      if (character.edges.some((item) => item.name === guide.name)) return setAdvanceError("Эта черта уже записана у героя.");
+      setCharacter((current) => ({
+        ...current,
+        advances: String(newAdvanceCount),
+        edgeAdvances: String(Math.max(0, safeNumber(current.edgeAdvances)) + 1),
+        edges: [...current.edges.filter((item) => item.name.trim() || item.note.trim()), { id: makeId(), name: guide.name, note: guide.detail }],
+      }));
+      recordAdvance(`Новая черта: ${guide.name}`);
+    } else if (advanceType === "skills") {
+      const first = skills.find((skill) => skill.id === advancePrimary);
+      const second = skills.find((skill) => skill.id === advanceSecondary);
+      if (!first) return setAdvanceError("Выберите навык.");
+      const firstDie = nextDie(first.level);
+      if (!firstDie) return setAdvanceError("Выбранный навык уже достиг d12.");
+      const firstBelowAttribute = first.level < character.attributes[first.attribute];
+      if (advanceSecondary) {
+        if (!second || second.id === first.id) return setAdvanceError("Выберите два разных навыка.");
+        const secondDie = nextDie(second.level);
+        if (!secondDie) return setAdvanceError("Один из выбранных навыков уже достиг d12.");
+        const secondBelowAttribute = second.level < character.attributes[second.attribute];
+        if (!firstBelowAttribute || !secondBelowAttribute) return setAdvanceError("Два навыка можно повысить вместе, только если оба ниже связанных характеристик.");
+        const firstAdvanceCost = skillCost({ ...first, level: firstDie }, character.attributes) - skillCost(first, character.attributes);
+        const secondAdvanceCost = skillCost({ ...second, level: secondDie }, character.attributes) - skillCost(second, character.attributes);
+        setSkills((current) => current.map((skill) => skill.id === first.id ? { ...skill, level: firstDie } : skill.id === second.id ? { ...skill, level: secondDie } : skill));
+        setCharacter((current) => ({ ...current, advances: String(newAdvanceCount), skillAdvancePoints: current.skillAdvancePoints + firstAdvanceCost + secondAdvanceCost }));
+        recordAdvance(`${first.name}: ${dieLabel(first.level)} → ${dieLabel(firstDie)}; ${second.name}: ${dieLabel(second.level)} → ${dieLabel(secondDie)}`);
+      } else {
+        if (firstBelowAttribute) return setAdvanceError("Этот навык ниже характеристики: выберите второй навык или повысьте его до уровня характеристики через несколько повышений.");
+        const firstAdvanceCost = skillCost({ ...first, level: firstDie }, character.attributes) - skillCost(first, character.attributes);
+        setSkills((current) => current.map((skill) => skill.id === first.id ? { ...skill, level: firstDie } : skill));
+        setCharacter((current) => ({ ...current, advances: String(newAdvanceCount), skillAdvancePoints: current.skillAdvancePoints + firstAdvanceCost }));
+        recordAdvance(`${first.name}: ${dieLabel(first.level)} → ${dieLabel(firstDie)}`);
+      }
+    } else if (advanceType === "attribute") {
+      const key = advancePrimary as AttributeKey;
+      if (!ATTRIBUTE_META.some((item) => item.key === key)) return setAdvanceError("Выберите характеристику.");
+      const raised = nextDie(character.attributes[key]);
+      if (!raised) return setAdvanceError("Эта характеристика уже достигла d12.");
+      const attributeAdvanceCost = character.purity === "Нечистый" && key === "vigor" ? 2 : 1;
+      if (newRank !== "Легенда" && character.attributeRaiseRanks.includes(newRank)) return setAdvanceError(`На ранге «${newRank}» характеристика уже повышалась.`);
+      if (newRank === "Легенда" && character.attributeRaiseRanks.filter((rank) => rank === "Легенда").length >= Math.ceil(Math.max(0, newAdvanceCount - 15) / 2)) return setAdvanceError("На ранге Легенды характеристику можно повышать каждым вторым повышением.");
+      setCharacter((current) => ({
+        ...current,
+        advances: String(newAdvanceCount),
+        attributes: { ...current.attributes, [key]: raised },
+        attributeAdvancePoints: current.attributeAdvancePoints + attributeAdvanceCost,
+        attributeRaiseRanks: [...current.attributeRaiseRanks, newRank],
+      }));
+      recordAdvance(`${ATTRIBUTE_META.find((item) => item.key === key)?.label}: ${dieLabel(character.attributes[key])} → ${dieLabel(raised)}`);
+    } else {
+      const hindrance = character.hindrances.find((item) => item.id === advancePrimary);
+      if (!hindrance || !hindrance.name) return setAdvanceError("Выберите изъян.");
+      if (hindrance.severity === "major") {
+        setCharacter((current) => ({
+          ...current,
+          advances: String(newAdvanceCount),
+          retiredHindrancePoints: current.retiredHindrancePoints + 1,
+          hindrances: current.hindrances.map((item) => item.id === hindrance.id ? { ...item, severity: "minor" } : item),
+        }));
+        recordAdvance(`Изъян «${hindrance.name}» уменьшен до мелкого`);
+      } else {
+        setCharacter((current) => ({
+          ...current,
+          advances: String(newAdvanceCount),
+          retiredHindrancePoints: current.retiredHindrancePoints + 1,
+          hindrances: current.hindrances.filter((item) => item.id !== hindrance.id),
+        }));
+        recordAdvance(`Изъян «${hindrance.name}» устранён`);
+      }
+    }
+
+    setAdvanceOpen(false);
+  };
+
+  const undoLastAdvance = () => {
+    const last = advanceHistory.at(-1);
+    if (!last) return;
+    if (!window.confirm(`Отменить повышение №${last.number}: ${last.summary}?`)) return;
+    const { skills: previousSkills, ...previousCharacter } = copyData(last.before);
+    setCharacter((current) => ({ ...current, ...previousCharacter }));
+    setSkills(previousSkills);
+    setAdvanceHistory((current) => current.slice(0, -1));
   };
 
   const updateEntry = <T extends TraitEntry | Weapon>(
@@ -453,6 +1559,7 @@ export default function Home() {
 
   const fillDemo = () => {
     const base = createInitialCharacter();
+    setAdvanceHistory([]);
     setCharacter({
       ...base,
       ...DEMO_CHARACTER,
@@ -481,11 +1588,122 @@ export default function Home() {
     );
   };
 
+  const switchHero = (heroId: string) => {
+    const hero = library?.heroes.find((item) => item.id === heroId);
+    if (!hero) return;
+    setActiveHeroId(hero.id);
+    setCharacter(copyData(hero.character));
+    setSkills(copyData(hero.skills));
+    setAdvanceHistory(copyData(hero.advanceHistory));
+  };
+
+  const createHero = () => {
+    const hero = makeHeroRecord();
+    setLibrary((current) => {
+      const next: HeroLibrary = {
+        version: 2,
+        activeHeroId: hero.id,
+        heroes: [...(current?.heroes || []), hero],
+      };
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+    setActiveHeroId(hero.id);
+    setCharacter(copyData(hero.character));
+    setSkills(copyData(hero.skills));
+    setAdvanceHistory([]);
+  };
+
+  const duplicateHero = () => {
+    const duplicatedCharacter = copyData(character);
+    duplicatedCharacter.name = `${character.name || "Новый персонаж"} - копия`;
+    const hero = makeHeroRecord(duplicatedCharacter, skills, advanceHistory);
+    setLibrary((current) => {
+      const next: HeroLibrary = {
+        version: 2,
+        activeHeroId: hero.id,
+        heroes: [...(current?.heroes || []), hero],
+      };
+      localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+    setActiveHeroId(hero.id);
+    setCharacter(copyData(hero.character));
+    setSkills(copyData(hero.skills));
+    setAdvanceHistory(copyData(hero.advanceHistory));
+  };
+
+  const deleteHero = () => {
+    if (!library || library.heroes.length <= 1) return;
+    if (!window.confirm(`Удалить героя «${character.name || "Без имени"}» из этого браузера?`)) return;
+    const remaining = library.heroes.filter((hero) => hero.id !== activeHeroId);
+    const nextActive = remaining[0];
+    const next: HeroLibrary = { version: 2, activeHeroId: nextActive.id, heroes: remaining };
+    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+    setLibrary(next);
+    setActiveHeroId(nextActive.id);
+    setCharacter(copyData(nextActive.character));
+    setSkills(copyData(nextActive.skills));
+    setAdvanceHistory(copyData(nextActive.advanceHistory));
+  };
+
   const resetAll = () => {
-    if (!window.confirm("Очистить анкету и начать заново?")) return;
+    if (!window.confirm("Очистить данные текущего героя? Остальные герои сохранятся.")) return;
     setCharacter(createInitialCharacter());
     setSkills(createInitialSkills());
-    localStorage.removeItem("ultima-forsan-character-v1");
+    setAdvanceHistory([]);
+  };
+
+  const exportHero = () => {
+    const payload = {
+      format: "ultima-forsan-hero",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      character: copyData(character),
+      skills: copyData(skills),
+      advanceHistory: copyData(advanceHistory),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const name = (character.name || "герой").replace(/[\\/:*?"<>|]/g, " ").trim();
+    anchor.href = url;
+    anchor.download = `${name} - Ultima Forsan.json`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const importHero = async (file?: File) => {
+    if (!file) return;
+    try {
+      if (file.size > 3 * 1024 * 1024) throw new Error("Файл слишком большой.");
+      const parsed = JSON.parse(await file.text()) as {
+        format?: string;
+        character?: Partial<Character>;
+        skills?: Skill[];
+        advanceHistory?: unknown;
+      };
+      if (parsed.format !== "ultima-forsan-hero" || !parsed.character || !Array.isArray(parsed.skills)) {
+        throw new Error("Это не файл героя Ultima Forsan.");
+      }
+      const importedCharacter = restoreCharacter(parsed.character);
+      const importedSkills = restoreSkills(parsed.skills);
+      const importedHistory = restoreAdvanceHistory(parsed.advanceHistory);
+      const hero = makeHeroRecord(importedCharacter, importedSkills, importedHistory);
+      setLibrary((current) => {
+        const next: HeroLibrary = { version: 2, activeHeroId: hero.id, heroes: [...(current?.heroes || []), hero] };
+        localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+      setActiveHeroId(hero.id);
+      setCharacter(copyData(hero.character));
+      setSkills(copyData(hero.skills));
+      setAdvanceHistory(copyData(hero.advanceHistory));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Не удалось импортировать героя.");
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
   };
 
   return (
@@ -510,6 +1728,28 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      <section className="hero-library" aria-label="Сохранённые герои">
+        <label>
+          <span>Мои герои</span>
+          <select value={activeHeroId} onChange={(event) => switchHero(event.target.value)}>
+            {(library?.heroes || []).map((hero, index) => (
+              <option key={hero.id} value={hero.id}>
+                {hero.character.name || `Безымянный герой ${index + 1}`} · {rankFromAdvances(hero.character.advances)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="library-actions">
+          <button onClick={createHero}>+ Новый</button>
+          <button onClick={duplicateHero} disabled={!activeHeroId}>Создать копию</button>
+          <button onClick={exportHero} disabled={!activeHeroId}>Экспорт</button>
+          <button onClick={() => importInput.current?.click()}>Импорт</button>
+          <button className="delete-hero" onClick={deleteHero} disabled={!library || library.heroes.length <= 1}>Удалить</button>
+        </div>
+        <input className="hero-import-input" ref={importInput} type="file" accept="application/json,.json" onChange={(event) => void importHero(event.target.files?.[0])} />
+        <p><i /> {savedAt ? `Сохранено автоматически в ${new Date(savedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "Локальное сохранение готово"}</p>
+      </section>
 
       <div className="mobile-switch" role="tablist" aria-label="Режим просмотра">
         <button
@@ -540,25 +1780,13 @@ export default function Home() {
           <details open>
             <summary><span>01</span> Основа персонажа</summary>
             <div className="section-body">
-              <div className="rules-toggle">
-                <button
-                  className={character.rulesMode === "swade" ? "active" : ""}
-                  onClick={() => update("rulesMode", "swade")}
-                >
-                  <strong>SWADE для кампании</strong>
-                  <small>12 пунктов, 5 базовых навыков d4</small>
-                </button>
-                <button
-                  className={character.rulesMode === "setting" ? "active" : ""}
-                  onClick={() => update("rulesMode", "setting")}
-                >
-                  <strong>Книга Ultima Forsan</strong>
-                  <small>15 пунктов, Харизма</small>
-                </button>
+              <div className="campaign-rules">
+                <strong>SWADE для кампании</strong>
+                <span>12 пунктов навыков · 5 базовых навыков d4 · особенности Ultima Forsan адаптированы</span>
               </div>
               <p className="rules-note">
-                Книга сеттинга написана для предыдущей редакции. Режим SWADE аккуратно сохраняет
-                особенности мира, но считает навыки по актуальной базе.
+                Генератор использует базовую механику SWADE. Если правило из книги сеттинга написано
+                для предыдущей редакции, подсказка отмечает адаптацию или необходимость решения ведущего.
               </p>
               <div className="field-grid two">
                 <Field label="Имя героя" value={character.name} maxLength={48} onChange={(value) => update("name", value)} placeholder="Как его зовут?" />
@@ -571,15 +1799,12 @@ export default function Home() {
                   </select>
                 </label>
                 <Field label="Происхождение / феод" value={character.origin} maxLength={44} onChange={(value) => update("origin", value)} placeholder="Например, Лукка" />
-                <label className="field">
-                  <span>Ранг</span>
-                  <select value={character.rank} onChange={(event) => update("rank", event.target.value)}>
-                    {[
-                      "Новичок", "Закалённый", "Ветеран", "Герой", "Легенда",
-                    ].map((rank) => <option key={rank}>{rank}</option>)}
-                  </select>
-                </label>
-                <Field label="Повышения" type="number" value={character.advances} onChange={(value) => update("advances", value)} />
+                <div className="rank-display" aria-live="polite">
+                  <span>Развитие</span>
+                  <strong>{currentRank}</strong>
+                  <small>{advances} повышений · {nextRankThreshold === null ? "высший ранг" : `следующий ранг с ${nextRankThreshold}`}</small>
+                </div>
+                <button className="advance-trigger" type="button" onClick={openAdvance}><span>+</span><b>Получить повышение</b><small>Выбрать улучшение героя</small></button>
                 <Field label="Возраст" value={character.age} maxLength={16} onChange={(value) => update("age", value)} />
                 <label className="field">
                   <span>Состояние крови</span>
@@ -588,6 +1813,23 @@ export default function Home() {
                     <option>Нечистый</option>
                   </select>
                 </label>
+              </div>
+              <div className="advance-history">
+                <div className="advance-history-title">
+                  <div><span>Журнал развития</span><small>{advanceHistory.length ? `${advanceHistory.length} записей` : "Новые повышения появятся здесь"}</small></div>
+                  <button type="button" disabled={!advanceHistory.length} onClick={undoLastAdvance}>Отменить последнее</button>
+                </div>
+                {advanceHistory.length > 0 && (
+                  <ol>
+                    {advanceHistory.slice().reverse().map((record) => (
+                      <li key={record.id}><b>№{record.number}</b><div><strong>{record.summary}</strong><small>{record.rank} · {new Date(record.createdAt).toLocaleDateString("ru-RU")}</small></div></li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+              <div className={`creation-lock ${character.creationLocked ? "is-locked" : ""}`}>
+                <div><b>{character.creationLocked ? "Создание завершено" : "Завершение создания"}</b><span>{character.creationLocked ? "Развитие параметров теперь проходит через кнопку повышения." : "Зафиксируйте стартового героя, когда распределите пункты и выберете черты."}</span></div>
+                {!character.creationLocked && <button type="button" disabled={!creationReady} onClick={lockCreation}>Зафиксировать героя</button>}
               </div>
               {character.purity === "Нечистый" && (
                 <div className="warning-box">
@@ -602,17 +1844,34 @@ export default function Home() {
                 placeholder="Что запомнит свидетель? Одежда, шрамы, голос, запах, привычный жест..."
                 maxLength={220}
               />
+              <div className="portrait-uploader">
+                <div className="portrait-preview">
+                  {character.portrait ? <img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt={`Портрет: ${character.name || "персонаж"}`} /> : <span aria-hidden="true">Θ</span>}
+                </div>
+                <div>
+                  <b>Портрет персонажа</b>
+                  <p>JPG, PNG или WebP до 12 МБ. Изображение уменьшится и сохранится вместе с героем только в этом браузере.</p>
+                  <input ref={portraitInput} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadPortrait(event.target.files?.[0])} />
+                  <div className="portrait-actions">
+                    <button className="button ghost" type="button" onClick={() => portraitInput.current?.click()}>{character.portrait ? "Заменить портрет" : "Загрузить портрет"}</button>
+                    {character.portrait && <button className="portrait-remove" type="button" onClick={() => { update("portrait", ""); setPortraitError(""); }}>Удалить</button>}
+                  </div>
+                  {portraitError && <small role="alert">{portraitError}</small>}
+                </div>
+              </div>
+              {character.portrait && <div className="portrait-crop-controls"><label><span>Горизонталь</span><input type="range" min="0" max="100" value={character.portraitX} onChange={(event) => update("portraitX", safeNumber(event.target.value, 50))} /></label><label><span>Вертикаль</span><input type="range" min="0" max="100" value={character.portraitY} onChange={(event) => update("portraitY", safeNumber(event.target.value, 50))} /></label><label><span>Масштаб</span><input type="range" min="100" max="180" value={character.portraitZoom} onChange={(event) => update("portraitZoom", safeNumber(event.target.value, 100))} /></label></div>}
             </div>
           </details>
 
           <details open>
             <summary><span>02</span> Характеристики</summary>
             <div className="section-body">
-              <div className={`budget ${attributePoints > 5 ? "over" : ""}`}>
-                <div><span>Потрачено</span><strong>{attributePoints}</strong></div>
-                <div className="budget-track"><i style={{ width: `${Math.min(100, (attributePoints / 5) * 100)}%` }} /></div>
-                <b>из 5</b>
+              <div className={`budget ${creationAttributePoints > 5 ? "over" : ""}`}>
+                <div><span>Создание</span><strong>{creationAttributePoints}</strong></div>
+                <div className="budget-track"><i style={{ width: `${Math.min(100, (creationAttributePoints / 5) * 100)}%` }} /></div>
+                <b>из 5{character.attributeAdvancePoints ? ` · +${character.attributeAdvancePoints} за повышения` : ""}</b>
               </div>
+              <fieldset className="creation-fields" disabled={character.creationLocked}>
               <div className="attribute-grid">
                 {ATTRIBUTE_META.map(({ key, label, abbr }) => (
                   <label className="attribute-card" key={key}>
@@ -627,6 +1886,7 @@ export default function Home() {
                   </label>
                 ))}
               </div>
+              </fieldset>
               <div className="derived-grid">
                 <div><span>Защита</span><strong>{parry}</strong><small>2 + 1/2 Драки</small></div>
                 <div><span>Стойкость</span><strong>{toughness}</strong><small>с бронёй</small></div>
@@ -635,9 +1895,6 @@ export default function Home() {
                 <label><span>Шаг</span><input type="number" value={character.pace} onChange={(event) => update("pace", safeNumber(event.target.value, 6))} /></label>
                 <label><span>Бег</span><DieSelect label="Кость бега" value={character.runningDie} allowUntrained={false} onChange={(value) => update("runningDie", value)} /></label>
                 <label><span>Фишки</span><input type="number" value={character.bennies} onChange={(event) => update("bennies", safeNumber(event.target.value, 3))} /></label>
-                {character.rulesMode === "setting" && (
-                  <label><span>Харизма</span><input type="number" value={character.charisma} onChange={(event) => update("charisma", safeNumber(event.target.value))} /></label>
-                )}
               </div>
             </div>
           </details>
@@ -645,29 +1902,31 @@ export default function Home() {
           <details open>
             <summary><span>03</span> Навыки</summary>
             <div className="section-body">
-              <div className={`budget ${skillPoints > skillBudget ? "over" : ""}`}>
-                <div><span>Потрачено</span><strong>{skillPoints}</strong></div>
-                <div className="budget-track"><i style={{ width: `${Math.min(100, (skillPoints / skillBudget) * 100)}%` }} /></div>
-                <b>из {skillBudget}</b>
+              <div className={`budget ${creationSkillPoints > skillBudget ? "over" : ""}`}>
+                <div><span>Создание</span><strong>{creationSkillPoints}</strong></div>
+                <div className="budget-track"><i style={{ width: `${Math.min(100, (creationSkillPoints / skillBudget) * 100)}%` }} /></div>
+                <b>из {skillBudget}{character.skillAdvancePoints ? ` · +${character.skillAdvancePoints} ступ. за повышения` : ""}</b>
               </div>
               <div className="skills-head"><span>Навык</span><span>Связан с</span><span>Кость</span><span>Цена</span></div>
+              <fieldset className="creation-fields" disabled={character.creationLocked}>
               <div className="skills-list">
                 {skills.map((skill) => (
                   <div className="skill-row" key={skill.id}>
                     {skill.id.startsWith("custom-") ? (
                       <input aria-label="Название навыка" value={skill.name} onChange={(event) => updateSkill(skill.id, { name: event.target.value })} />
                     ) : (
-                      <strong>{skill.name}{skill.core && character.rulesMode === "swade" ? <em>базовый</em> : null}</strong>
+                      <strong>{skill.name}{skill.core ? <em>базовый</em> : null}</strong>
                     )}
                     <select aria-label={`Характеристика для ${skill.name}`} value={skill.attribute} onChange={(event) => updateSkill(skill.id, { attribute: event.target.value as AttributeKey })}>
                       {ATTRIBUTE_META.map((attribute) => <option key={attribute.key} value={attribute.key}>{attribute.abbr}</option>)}
                     </select>
                     <DieSelect label={`Уровень навыка ${skill.name}`} value={skill.level} onChange={(level) => updateSkill(skill.id, { level })} />
-                    <span className="skill-cost">{skillCost(skill, character.attributes, character.rulesMode)}</span>
+                    <span className="skill-cost">{skillCost(skill, character.attributes)}</span>
                     {skill.id.startsWith("custom-") && <button className="remove" aria-label="Удалить навык" onClick={() => setSkills((current) => current.filter((item) => item.id !== skill.id))}>×</button>}
                   </div>
                 ))}
               </div>
+              </fieldset>
               <button
                 className="add-row"
                 disabled={skills.filter((skill) => skill.id.startsWith("custom-")).length >= 4}
@@ -687,23 +1946,34 @@ export default function Home() {
 
           <details open>
             <summary><span>04</span> Черты и изъяны</summary>
-            <div className="section-body split-entries">
+            <fieldset className="section-body split-entries creation-fields" disabled={character.creationLocked}>
               <div>
-                <div className="entry-title"><h3>Черты</h3><small>обычно 1 бесплатная у человека</small></div>
+                <div className="entry-title">
+                  <h3>Черты</h3>
+                  <small className={chosenEdgeCount > edgeLimit ? "bad" : ""}>{chosenEdgeCount}/{edgeLimit} доступных мест</small>
+                </div>
+                <div className="edge-budget-note">
+                  <span>База: {baseEdgeSlots}</span>
+                  <span>За изъяны: {hindranceEdgeSlots}</span>
+                  <span>За повышения: {edgeAdvances}</span>
+                  <span>По рангу «{currentRank}»: {availableEdgeCount} вариантов</span>
+                </div>
+                {safeNumber(character.edgeAdvances) > advances && <p className="entry-warning">На черты нельзя потратить больше повышений, чем получено.</p>}
+                {chosenEdgeCount > edgeLimit && <p className="entry-warning">Уберите лишние черты или получите для них очки изъянов / повышения.</p>}
                 {character.edges.map((entry) => (
-                  <div className="entry-row" key={entry.id}>
-                    <input aria-label="Черта" value={entry.name} placeholder="Название" onChange={(event) => updateEntry<TraitEntry>("edges", entry.id, { name: event.target.value })} />
+                  <div className="entry-row guided" key={entry.id}>
+                    <TraitGuideInput kind="edge" rank={currentRank} entry={entry} onChange={(patch) => updateEntry<TraitEntry>("edges", entry.id, patch)} />
                     <input aria-label="Эффект черты" value={entry.note} placeholder="Краткий эффект" onChange={(event) => updateEntry<TraitEntry>("edges", entry.id, { note: event.target.value })} />
                     <button className="remove" aria-label="Удалить черту" onClick={() => removeEntry("edges", entry.id)}>×</button>
                   </div>
                 ))}
-                <button className="add-row" disabled={character.edges.length >= 6} onClick={() => update("edges", [...character.edges, blankEdge()])}>+ Добавить черту</button>
+                <button className="add-row" disabled={character.edges.length >= 20 || addableEdgeRows === 0} onClick={() => update("edges", [...character.edges, blankEdge()])}>+ Добавить черту{addableEdgeRows > 0 ? ` (ещё ${addableEdgeRows})` : ""}</button>
               </div>
               <div>
-                <div className="entry-title"><h3>Изъяны</h3><small className={hindrancePoints > 4 ? "bad" : ""}>{hindrancePoints} пунктов, выгода максимум за 4</small></div>
+                <div className="entry-title"><h3>Изъяны</h3><small className={hindrancePoints + character.retiredHindrancePoints > 4 ? "bad" : ""}>{hindrancePoints} сейчас{character.retiredHindrancePoints ? ` · ${character.retiredHindrancePoints} устранено повышениями` : ""}, выгода максимум за 4</small></div>
                 {character.hindrances.map((entry) => (
-                  <div className="entry-row hindrance" key={entry.id}>
-                    <input aria-label="Изъян" value={entry.name} placeholder="Название" onChange={(event) => updateEntry<TraitEntry>("hindrances", entry.id, { name: event.target.value })} />
+                  <div className="entry-row hindrance guided" key={entry.id}>
+                    <TraitGuideInput kind="hindrance" rank={currentRank} entry={entry} onChange={(patch) => updateEntry<TraitEntry>("hindrances", entry.id, patch)} />
                     <select aria-label="Тяжесть изъяна" value={entry.severity} onChange={(event) => updateEntry<TraitEntry>("hindrances", entry.id, { severity: event.target.value as TraitEntry["severity"] })}>
                       <option value="minor">Мелкий</option>
                       <option value="major">Крупный</option>
@@ -712,33 +1982,83 @@ export default function Home() {
                     <button className="remove" aria-label="Удалить изъян" onClick={() => removeEntry("hindrances", entry.id)}>×</button>
                   </div>
                 ))}
-                <button className="add-row" disabled={character.hindrances.length >= 6} onClick={() => update("hindrances", [...character.hindrances, blankHindrance()])}>+ Добавить изъян</button>
+                <button className="add-row" disabled={character.hindrances.length >= 8} onClick={() => update("hindrances", [...character.hindrances, blankHindrance()])}>+ Добавить изъян</button>
               </div>
-            </div>
+            </fieldset>
           </details>
 
           <details open>
             <summary><span>05</span> Оружие и снаряжение</summary>
             <div className="section-body">
+              <p className="weapon-guide-intro"><b>Справочник вооружения.</b> Начните вводить название и выберите вариант — характеристики заполнятся автоматически. Именное или необычное оружие можно вписать вручную.</p>
               <div className="weapon-head"><span>Оружие</span><span>Дистанция</span><span>Урон</span><span>ББ</span><span>Боезапас</span></div>
-              {character.weapons.map((weapon) => (
-                <div className="weapon-row" key={weapon.id}>
-                  {(["name", "range", "damage", "ap", "ammo"] as (keyof Weapon)[]).map((key) => (
-                    <input key={key} aria-label={`${key} оружия`} value={weapon[key]} onChange={(event) => updateEntry<Weapon>("weapons", weapon.id, { [key]: event.target.value })} />
-                  ))}
-                  <button className="remove" aria-label="Удалить оружие" onClick={() => removeEntry("weapons", weapon.id)}>×</button>
-                </div>
-              ))}
+              {character.weapons.map((weapon) => {
+                const guide = WEAPON_GUIDES.find((item) => item.name.toLocaleLowerCase("ru") === weapon.name.trim().toLocaleLowerCase("ru"));
+                return (
+                  <div className="weapon-block" key={weapon.id}>
+                    <div className="weapon-row">
+                      <WeaponGuideInput weapon={weapon} onChange={(patch) => updateEntry<Weapon>("weapons", weapon.id, patch)} />
+                      {(["range", "damage", "ap", "ammo"] as (keyof Weapon)[]).map((key) => (
+                        <input key={key} aria-label={`${key} оружия`} value={weapon[key]} onChange={(event) => updateEntry<Weapon>("weapons", weapon.id, { [key]: event.target.value })} />
+                      ))}
+                      <button className="remove" aria-label="Удалить оружие" onClick={() => removeEntry("weapons", weapon.id)}>×</button>
+                    </div>
+                    {guide && <div className="weapon-guide-hint"><b>{guide.category}</b><span>{guide.detail}</span></div>}
+                    {guide && weapon.price ? <div className="weapon-purchase"><span>{weapon.price} фл. · {weapon.weight} кг</span>{weapon.purchased ? <button type="button" onClick={() => returnWeapon(weapon.id)}>Вернуть</button> : <button type="button" disabled={safeNumber(character.florins) < weapon.price} onClick={() => purchaseWeapon(weapon.id)}>Купить оружие</button>}</div> : null}
+                  </div>
+                );
+              })}
               <button className="add-row" disabled={character.weapons.length >= 5} onClick={() => update("weapons", [...character.weapons, blankWeapon()])}>+ Добавить оружие</button>
-              <div className="field-grid money-grid">
-                <Field label="Осталось флоринов" value={character.florins} maxLength={16} onChange={(value) => update("florins", value)} />
+              <div className="equipment-summary">
+                <div><span>Флорины</span><strong>{character.florins || 0}</strong></div>
+                <div className={encumbered ? "bad" : ""}><span>Нагрузка</span><strong>{inventoryWeight.toLocaleString("ru-RU")} / {loadLimit} кг</strong><small>{encumbered ? "Перегрузка: -2 к Шагу, бегу и Ловкости" : "Комфортная нагрузка"}</small></div>
+                <div><span>Экипировано</span><strong>Броня {effectiveArmor} · Защита +{equippedShield?.parry || 0}</strong></div>
               </div>
+              <div className="equipment-store">
+                <h3>Броня, щиты и припасы</h3>
+                <div className="equipment-catalog">
+                  {EQUIPMENT_GUIDES.map((guide) => (
+                    <article key={guide.id}>
+                      <span>{guide.category}</span><b>{guide.name}</b><p>{guide.detail}</p>
+                      <small>{guide.price} фл. · {guide.weight} кг{guide.armor ? ` · броня +${guide.armor}` : ""}{guide.parry ? ` · Защита +${guide.parry}` : ""}</small>
+                      <button type="button" disabled={safeNumber(character.florins) < guide.price} onClick={() => purchaseEquipment(guide.id)}>Купить</button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+              {character.inventory.length > 0 && <div className="inventory-list"><h3>В рюкзаке и на герое</h3>{character.inventory.map((item) => <div key={item.id}><label>{(item.category === "Доспех" || item.category === "Щит") && <input type="checkbox" checked={item.equipped} onChange={(event) => setEquipmentWorn(item.id, event.target.checked)} />}<b>{item.name}</b></label><span>{item.quantity} шт. · {(item.weight * item.quantity).toLocaleString("ru-RU")} кг</span><button type="button" onClick={() => sellEquipment(item.id)}>Вернуть</button></div>)}</div>}
+              <div className="field-grid money-grid"><Field label="Исправить остаток флоринов вручную" value={character.florins} maxLength={16} onChange={(value) => update("florins", value)} /></div>
               <TextAreaField label="Снаряжение, броня и припасы" value={character.gear} onChange={(value) => update("gear", value)} maxLength={520} placeholder="Маска, инструменты, броня, лекарства, реликвии..." />
             </div>
           </details>
 
           <details open>
-            <summary><span>06</span> Человек под маской</summary>
+            <summary><span>06</span> Состояние в игре</summary>
+            <div className="section-body session-state">
+              <p>Временные отметки сохраняются с героем, но не изменяют постоянные параметры.</p>
+              <div className="state-grid">
+                <label><span>Ранения</span><input type="number" min="0" max="3" value={character.wounds} onChange={(event) => update("wounds", Math.min(3, Math.max(0, safeNumber(event.target.value))))} /></label>
+                <label><span>Усталость</span><input type="number" min="0" max="2" value={character.fatigue} onChange={(event) => update("fatigue", Math.min(2, Math.max(0, safeNumber(event.target.value))))} /></label>
+                <label><span>Фишки сейчас</span><input type="number" min="0" value={character.sessionBennies} onChange={(event) => update("sessionBennies", Math.max(0, safeNumber(event.target.value)))} /></label>
+                <label><span>Контакт с Чумой</span><input type="number" min="0" value={character.plagueExposure} onChange={(event) => update("plagueExposure", Math.max(0, safeNumber(event.target.value)))} /></label>
+              </div>
+              <div className="state-toggles"><label><input type="checkbox" checked={character.shaken} onChange={(event) => update("shaken", event.target.checked)} /> В шоке</label><label><input type="checkbox" checked={character.infected} onChange={(event) => update("infected", event.target.checked)} /> Заражён Чумой</label></div>
+              <div className="ammo-tracker"><h3>Потраченный боезапас</h3>{character.weapons.filter((weapon) => weapon.name && weapon.ammo !== "-").map((weapon) => <label key={weapon.id}><span>{weapon.name}</span><input type="number" min="0" value={character.ammoSpent[weapon.id] || 0} onChange={(event) => update("ammoSpent", { ...character.ammoSpent, [weapon.id]: Math.max(0, safeNumber(event.target.value)) })} /></label>)}</div>
+            </div>
+          </details>
+
+          <details>
+            <summary><span>07</span> Настройки PDF</summary>
+            <div className="section-body print-settings">
+              <label><input type="checkbox" checked={character.printPortrait} onChange={(event) => update("printPortrait", event.target.checked)} /> Печатать портрет</label>
+              <label><input type="checkbox" checked={character.printDiceValues} onChange={(event) => update("printDiceValues", event.target.checked)} /> Показывать цифры внутри контуров дайсов</label>
+              <label><input type="checkbox" checked={character.printExtraNotesPage} onChange={(event) => update("printExtraNotesPage", event.target.checked)} /> Добавить третью страницу для заметок</label>
+              <p>Фон листа при печати всегда отключён для экономии чернил.</p>
+            </div>
+          </details>
+
+          <details open>
+            <summary><span>08</span> Человек под маской</summary>
             <div className="section-body">
               <div className="field-grid two narrative-grid">
                 <TextAreaField label="Родина и прошлое" value={character.homeland} onChange={(value) => update("homeland", value)} placeholder="Откуда вы и что оставили позади?" />
@@ -784,7 +2104,7 @@ export default function Home() {
               <section className="identity-grid">
                 <PrintLine label="Игрок" value={character.player} />
                 <PrintLine label="Происхождение" value={character.origin} />
-                <PrintLine label="Ранг" value={`${character.rank} / ${character.advances || 0}`} />
+                <PrintLine label="Ранг / повышения" value={`${currentRank} / ${advances}`} />
                 <PrintLine label="Возраст" value={character.age} />
               </section>
 
@@ -792,7 +2112,15 @@ export default function Home() {
                 <h3><span>I</span> Характеристики</h3>
                 <div className="print-attributes">
                   {ATTRIBUTE_META.map(({ key, label, abbr }) => (
-                    <div key={key}><small>{abbr}</small><b>{dieLabel(character.attributes[key])}</b><span>{label}</span></div>
+                    <div key={key}>
+                      <small>{abbr}</small>
+                      <b>{label}</b>
+                      <div className={`attribute-dice ${character.printDiceValues ? "" : "hide-die-values"}`} aria-label={`${label}: ${dieLabel(character.attributes[key])}`}>
+                        {ATTRIBUTE_DICE.map((die) => (
+                          <AttributeDie die={die} current={character.attributes[key] === die} key={die} />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -802,56 +2130,47 @@ export default function Home() {
                   <h3><span>II</span> Боевая готовность</h3>
                   <div className="big-stat-row">
                     <div><small>Защита</small><b>{parry}</b></div>
-                    <div><small>Стойкость</small><b>{toughness}</b><em>({character.armor})</em></div>
+                    <div><small>Стойкость</small><b>{toughness}</b><em>({effectiveArmor})</em></div>
                     <div><small>Шаг</small><b>{character.pace}</b></div>
                     <div><small>Бег</small><b>{dieLabel(character.runningDie)}</b></div>
                     <div><small>Фишки</small><b>{character.bennies}</b></div>
-                    {character.rulesMode === "setting" && <div><small>Харизма</small><b>{character.charisma >= 0 ? `+${character.charisma}` : character.charisma}</b></div>}
+                    <div className="blood-stat">
+                      <small>Кровь</small>
+                      <b>{character.purity}</b>
+                      <p>{character.purity === "Нечистый" ? "Иммунитет к Чуме · заразная кровь · восстанет после смерти" : "Обычный человек · 1 бесплатная черта при создании"}</p>
+                    </div>
                   </div>
                   <div className="tracks">
-                    <PipTrack count={3} label="Ранения" />
-                    <PipTrack count={3} label="Усталость" />
+                    <PipTrack count={3} label={`Ранения${character.wounds ? `: ${character.wounds}` : ""}`} />
+                    <PipTrack count={3} label={`Усталость${character.fatigue ? `: ${character.fatigue}` : ""}`} />
                   </div>
-                </div>
-                <div className="blood-note">
-                  <small>СОСТОЯНИЕ КРОВИ</small>
-                  <strong>{character.purity}</strong>
-                  <p>{character.purity === "Нечистый" ? "Иммунитет к Чуме. Заразная кровь. После смерти восстанет." : "Обычный человек. Одна бесплатная черта при создании."}</p>
                 </div>
               </section>
 
-              <section className="sheet-section weapons-section">
-                <h3><span>III</span> Оружие</h3>
-                <table>
-                  <thead><tr><th>Наименование</th><th>Дистанция</th><th>Урон</th><th>ББ</th><th>Боезапас</th></tr></thead>
-                  <tbody>
-                    {Array.from({ length: 5 }).map((_, index) => {
-                      const weapon = character.weapons[index];
-                      return <tr key={index}><td>{weapon?.name || ""}</td><td>{weapon?.range || ""}</td><td>{weapon?.damage || ""}</td><td>{weapon?.ap || ""}</td><td>{weapon?.ammo || ""}</td></tr>;
-                    })}
-                  </tbody>
-                </table>
+              <section className="sheet-section skills-print first-page-skills">
+                <h3><span>III</span> Навыки <small>{skillPoints}/{skillBudget} пунктов</small></h3>
+                <div className="skills-print-grid">
+                  {printSkills.map((skill) => (
+                    <div key={skill.id}><span>{skill.name}</span><small>{ATTRIBUTE_META.find((item) => item.key === skill.attribute)?.abbr}</small><b>{dieLabel(skill.level)}</b></div>
+                  ))}
+                  {Array.from({ length: Math.max(0, 24 - printSkills.length) }).map((_, index) => <div className="blank-skill" key={`blank-${index}`}><span /><small /><b /></div>)}
+                </div>
               </section>
 
               <div className="traits-print-grid">
-                <section className="sheet-section trait-list">
+                <section className={`sheet-section trait-list ${chosenEdgeCount > 8 ? "dense-list" : ""}`}>
                   <h3><span>IV</span> Черты</h3>
-                  {character.edges.filter((item) => item.name).slice(0, 6).map((item) => <div key={item.id}><b>{item.name}</b><span>{item.note}</span></div>)}
+                  {character.edges.filter((item) => item.name).slice(0, 20).map((item) => <div key={item.id}><b>{item.name}</b><span>{item.note}</span></div>)}
                   {!character.edges.some((item) => item.name) && <p className="empty-print">Черты ещё не записаны</p>}
                 </section>
                 <section className="sheet-section trait-list hindrance-list">
                   <h3><span>V</span> Изъяны</h3>
-                  {character.hindrances.filter((item) => item.name).slice(0, 6).map((item) => <div key={item.id}><b>{item.name} <em>{item.severity === "major" ? "К" : "М"}</em></b><span>{item.note}</span></div>)}
+                  {character.hindrances.filter((item) => item.name).slice(0, 8).map((item) => <div key={item.id}><b>{item.name} <em>{item.severity === "major" ? "К" : "М"}</em></b><span>{item.note}</span></div>)}
                   {!character.hindrances.some((item) => item.name) && <p className="empty-print">Изъяны ещё не записаны</p>}
                 </section>
               </div>
 
-              <section className="appearance-print">
-                <h3>ОПИСАНИЕ И ПРИМЕТЫ</h3>
-                <p>{character.appearance || "Место для портрета, примет и слов очевидцев."}</p>
-              </section>
-
-              <footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист I / II</span></footer>
+              <footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист I / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
 
             <article className="character-sheet sheet-two">
@@ -862,14 +2181,17 @@ export default function Home() {
                 <div className="folio">II</div>
               </header>
 
-              <section className="sheet-section skills-print">
-                <h3><span>VI</span> Навыки <small>{skillPoints}/{skillBudget} пунктов</small></h3>
-                <div className="skills-print-grid">
-                  {printSkills.map((skill) => (
-                    <div key={skill.id}><span>{skill.name}</span><small>{ATTRIBUTE_META.find((item) => item.key === skill.attribute)?.abbr}</small><b>{dieLabel(skill.level)}</b></div>
-                  ))}
-                  {Array.from({ length: Math.max(0, 12 - printSkills.length) }).map((_, index) => <div className="blank-skill" key={`blank-${index}`}><span /><small /><b /></div>)}
-                </div>
+              <section className="sheet-section weapons-section second-page-weapons">
+                <h3><span>VI</span> Оружие</h3>
+                <table>
+                  <thead><tr><th>Наименование</th><th>Дистанция</th><th>Урон</th><th>ББ</th><th>Боезапас</th></tr></thead>
+                  <tbody>
+                    {Array.from({ length: 5 }).map((_, index) => {
+                      const weapon = character.weapons[index];
+                      return <tr key={index}><td>{weapon?.name || ""}</td><td>{weapon?.range || ""}</td><td>{weapon?.damage || ""}</td><td>{weapon?.ap || ""}</td><td>{weapon?.ammo || ""}</td></tr>;
+                    })}
+                  </tbody>
+                </table>
               </section>
 
               <div className="language-gear-grid">
@@ -886,11 +2208,19 @@ export default function Home() {
 
               <section className="sheet-section gear-print">
                 <h3><span>IX</span> Снаряжение, броня и припасы</h3>
-                <p>{character.gear || "-"}</p>
+                <p>{[...character.inventory.map((item) => `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ""}`), character.gear].filter(Boolean).join("; ") || "-"}</p>
+              </section>
+
+              <section className="appearance-print second-page-appearance">
+                <h3><span>X</span> Описание и приметы</h3>
+                <div className={character.portrait && character.printPortrait ? "appearance-with-portrait" : ""}>
+                  {character.portrait && character.printPortrait && <figure><img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt="" /></figure>}
+                  <p>{character.appearance || (character.portrait && character.printPortrait ? "" : "Место для портрета, примет и слов очевидцев.")}</p>
+                </div>
               </section>
 
               <section className="sheet-section biography-print">
-                <h3><span>X</span> Человек под маской</h3>
+                <h3><span>XI</span> Человек под маской</h3>
                 <div>
                   <article><small>Родина и прошлое</small><p>{character.homeland || "-"}</p></article>
                   <article><small>Вера или убеждение</small><p>{character.belief || "-"}</p></article>
@@ -911,11 +2241,71 @@ export default function Home() {
                 <div>{Array.from({ length: 4 }).map((_, index) => <span key={index} />)}</div>
               </section>
 
-              <footer className="sheet-footer"><span>{character.rulesMode === "swade" ? "SWADE - адаптация" : "Правила книги сеттинга"}</span><b>Θ</b><span>Лист II / II</span></footer>
+              <footer className="sheet-footer"><span>SWADE - адаптация кампании</span><b>Θ</b><span>Лист II / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
+            {character.printExtraNotesPage && <article className="character-sheet notes-page"><div className="sheet-crop top-left" /><div className="sheet-crop top-right" /><header className="sheet-header compact"><div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div><div className="sheet-title"><small>ПОЛЕВОЙ ЖУРНАЛ / III</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div><div className="folio">III</div></header><section><h3>Заметки, улики и долги</h3>{Array.from({ length: 28 }).map((_, index) => <i key={index} />)}</section><footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист III / III</span></footer></article>}
           </div>
         </section>
       </div>
+
+      {advanceOpen && (
+        <div className="advance-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setAdvanceOpen(false)}>
+          <section className="advance-modal" role="dialog" aria-modal="true" aria-labelledby="advance-title">
+            <header>
+              <div><small>ПОВЫШЕНИЕ №{Math.floor(advances) + 1}</small><h2 id="advance-title">Как изменился герой?</h2></div>
+              <button type="button" aria-label="Закрыть окно повышения" onClick={() => setAdvanceOpen(false)}>×</button>
+            </header>
+            <p className="advance-rank-note">После повышения: <b>{rankFromAdvances(advances + 1)}</b>{rankFromAdvances(advances + 1) !== currentRank && <em> · новый ранг</em>}</p>
+            <div className="advance-types" role="radiogroup" aria-label="Вид улучшения">
+              {([
+                ["edge", "Новая черта", "Выберите доступную черту нового ранга"],
+                ["skills", "Повысить навыки", "Один навык не ниже характеристики или два ниже неё"],
+                ["attribute", "Характеристика", "Одна ступень, обычно один раз за ранг"],
+                ["hindrance", "Устранить изъян", "Уменьшить крупный или убрать мелкий"],
+              ] as [AdvanceType, string, string][]).map(([type, title, description]) => (
+                <button key={type} type="button" role="radio" aria-checked={advanceType === type} className={advanceType === type ? "active" : ""} onClick={() => { setAdvanceType(type); setAdvancePrimary(""); setAdvanceSecondary(""); setAdvanceError(""); }}>
+                  <b>{title}</b><small>{description}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="advance-choice">
+              {advanceType === "edge" && (
+                <div className="advance-edge-picker">
+                  <span>Черта</span>
+                  <TraitGuideInput
+                    kind="edge"
+                    entry={{ id: "advance-edge", name: advancePrimary, note: "" }}
+                    rank={rankFromAdvances(advances + 1)}
+                    excludeNames={character.edges.map((edge) => edge.name)}
+                    disableFutureRank
+                    requirementIssues={(guide) => edgeRequirementIssues(guide, rankFromAdvances(advances + 1), character, skills)}
+                    onChange={(patch) => {
+                      setAdvancePrimary(patch.name ?? "");
+                      setAdvanceError("");
+                    }}
+                  />
+                </div>
+              )}
+              {advanceType === "skills" && (
+                <>
+                  <label><span>Первый навык</span><select value={advancePrimary} onChange={(event) => setAdvancePrimary(event.target.value)}><option value="">Выберите навык</option>{skills.filter((skill) => nextDie(skill.level)).map((skill) => <option value={skill.id} key={skill.id}>{skill.name}: {dieLabel(skill.level)} → {dieLabel(nextDie(skill.level) || skill.level)}</option>)}</select></label>
+                  <label><span>Второй навык, если оба ниже характеристик</span><select value={advanceSecondary} onChange={(event) => setAdvanceSecondary(event.target.value)}><option value="">Не выбран</option>{skills.filter((skill) => skill.id !== advancePrimary && nextDie(skill.level) && skill.level < character.attributes[skill.attribute]).map((skill) => <option value={skill.id} key={skill.id}>{skill.name}: {dieLabel(skill.level)} → {dieLabel(nextDie(skill.level) || skill.level)}</option>)}</select></label>
+                </>
+              )}
+              {advanceType === "attribute" && (
+                <label><span>Характеристика</span><select value={advancePrimary} onChange={(event) => setAdvancePrimary(event.target.value)}><option value="">Выберите характеристику</option>{ATTRIBUTE_META.filter(({ key }) => nextDie(character.attributes[key])).map(({ key, label }) => <option value={key} key={key}>{label}: {dieLabel(character.attributes[key])} → {dieLabel(nextDie(character.attributes[key]) || character.attributes[key])}</option>)}</select></label>
+              )}
+              {advanceType === "hindrance" && (
+                <label><span>Изъян</span><select value={advancePrimary} onChange={(event) => setAdvancePrimary(event.target.value)}><option value="">Выберите изъян</option>{character.hindrances.filter((item) => item.name).map((item) => <option value={item.id} key={item.id}>{item.name} — {item.severity === "major" ? "крупный → мелкий" : "устранить"}</option>)}</select></label>
+              )}
+            </div>
+
+            {advanceError && <p className="advance-error" role="alert">{advanceError}</p>}
+            <footer><button className="button ghost" type="button" onClick={() => setAdvanceOpen(false)}>Отмена</button><button className="button primary" type="button" onClick={applyAdvance}>Применить повышение</button></footer>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
