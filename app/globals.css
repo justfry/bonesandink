@@ -437,6 +437,7 @@ details[open] summary::after { content: "−"; }
 .skill-row em { margin-left: 6px; color: #8e252a; font: 700 7px/1 var(--sans); text-transform: uppercase; letter-spacing: .08em; }
 .skill-row select, .skill-row input { height: 27px; padding: 0 5px; font-size: 10px; }
 .skill-attribute { height: 27px; display: flex; align-items: center; padding: 0 6px; color: #6c5d52; font-size: 10px; font-weight: 800; }
+.entry-row.hindrance > select:disabled { color: #594b42; background: #ede6dc; cursor: not-allowed; opacity: 1; }
 .skill-cost { width: 24px; height: 24px; display: grid; place-items: center; color: #fff9ec; background: #524a44; border-radius: 50%; font-size: 9px; font-weight: 800; }
 .remove { border: 0; color: #a69689; background: transparent; font-size: 17px; line-height: 1; }
 .remove:hover { color: #8f2429; }

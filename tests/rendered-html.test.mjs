@@ -62,6 +62,10 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /minorDetail:/);
   assert.match(page, /majorDetail:/);
   assert.match(page, /generatedNotes\.includes\(entry\.note\)/);
+  assert.match(page, /restoredHindrances/);
+  assert.match(page, /disabled=\{Boolean\(fixedSeverity\)\}/);
+  assert.match(page, /Тяжесть изъяна задана правилами/);
+  assert.match(page, /namedGuide && namedGuide\.severity !== "either"/);
   assert.match(page, /function TraitGuideInput/);
   assert.match(page, /disableFutureRank/);
   assert.match(page, /className="advance-edge-picker"/);

@@ -757,6 +757,12 @@ function restoreCharacter(value?: Partial<Character>): Character {
       ? { ...entry, name: "Сыщик", note: "+2 к Поиску информации и Вниманию при поиске улик." }
       : entry
   ));
+  const restoredHindrances = rest.hindrances?.map((entry) => {
+    const guide = HINDRANCE_GUIDES.find(
+      (item) => item.name.toLocaleLowerCase("ru") === entry.name.trim().toLocaleLowerCase("ru"),
+    );
+    return guide && guide.severity !== "either" ? { ...entry, severity: guide.severity } : entry;
+  });
   return {
     ...initial,
     ...rest,
@@ -776,7 +782,7 @@ function restoreCharacter(value?: Partial<Character>): Character {
           ...(restoredEdges.some((entry) => !entry.name.trim() && !entry.note.trim()) ? [blankEdge()] : []),
         ]
       : initial.edges,
-    hindrances: rest.hindrances?.length ? rest.hindrances : initial.hindrances,
+    hindrances: restoredHindrances?.length ? restoredHindrances : initial.hindrances,
     weapons: rest.weapons?.length ? rest.weapons : initial.weapons,
   };
 }
@@ -2212,12 +2218,27 @@ export default function Home() {
               </div>
               <div>
                 <div className="entry-title"><h3>Изъяны</h3><small className={hindrancePoints + character.retiredHindrancePoints > 4 ? "bad" : ""}>{hindrancePoints} сейчас{character.retiredHindrancePoints ? ` · ${character.retiredHindrancePoints} устранено повышениями` : ""}, выгода максимум за 4</small></div>
-                {character.hindrances.map((entry) => (
+                {character.hindrances.map((entry) => {
+                  const guide = HINDRANCE_GUIDES.find((item) => item.name.toLocaleLowerCase("ru") === entry.name.trim().toLocaleLowerCase("ru"));
+                  const fixedSeverity = guide && guide.severity !== "either" ? guide.severity : undefined;
+                  return (
                   <div className="entry-row hindrance guided" key={entry.id}>
-                    <TraitGuideInput kind="hindrance" rank={currentRank} entry={entry} onChange={(patch) => updateEntry<TraitEntry>("hindrances", entry.id, patch)} />
-                    <select aria-label="Тяжесть изъяна" value={entry.severity} onChange={(event) => {
+                    <TraitGuideInput kind="hindrance" rank={currentRank} entry={entry} onChange={(patch) => {
+                      const namedGuide = patch.name === undefined ? undefined : HINDRANCE_GUIDES.find(
+                        (item) => item.name.toLocaleLowerCase("ru") === patch.name?.trim().toLocaleLowerCase("ru"),
+                      );
+                      updateEntry<TraitEntry>("hindrances", entry.id, {
+                        ...patch,
+                        ...(namedGuide && namedGuide.severity !== "either" ? { severity: namedGuide.severity } : {}),
+                      });
+                    }} />
+                    <select
+                      aria-label={fixedSeverity ? "Тяжесть изъяна задана правилами" : "Тяжесть изъяна"}
+                      disabled={Boolean(fixedSeverity)}
+                      title={fixedSeverity ? `По правилам этот изъян только ${fixedSeverity === "major" ? "крупный" : "мелкий"}` : "Выберите тяжесть изъяна"}
+                      value={fixedSeverity || entry.severity}
+                      onChange={(event) => {
                       const severity = event.target.value as TraitEntry["severity"];
-                      const guide = HINDRANCE_GUIDES.find((item) => item.name.toLocaleLowerCase("ru") === entry.name.trim().toLocaleLowerCase("ru"));
                       const generatedNotes = guide ? [guide.detail, guide.minorDetail, guide.majorDetail].filter(Boolean) : [];
                       const canRefreshNote = !entry.note.trim() || generatedNotes.includes(entry.note);
                       updateEntry<TraitEntry>("hindrances", entry.id, {
@@ -2231,7 +2252,7 @@ export default function Home() {
                     <input aria-label="Проявление изъяна" value={entry.note} placeholder="Как проявляется" onChange={(event) => updateEntry<TraitEntry>("hindrances", entry.id, { note: event.target.value })} />
                     <button className="remove" aria-label="Удалить изъян" onClick={() => removeEntry("hindrances", entry.id)}>×</button>
                   </div>
-                ))}
+                );})}
                 <button className="add-row" disabled={character.hindrances.length >= 8} onClick={() => update("hindrances", [...character.hindrances, blankHindrance()])}>+ Добавить изъян</button>
               </div>
             </fieldset>
