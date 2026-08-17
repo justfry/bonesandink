@@ -144,6 +144,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /Зафиксировать героя/);
   assert.ok(page.indexOf("Зафиксировать героя") > page.indexOf('className="form-footer"'));
   assert.match(page, /className="play-dashboard"/);
+  assert.match(page, /<span>Флорины<\/span><strong>\{character\.florins \|\| 0\}<\/strong><small>наличные<\/small>/);
   assert.match(page, /"play-workspace"/);
   assert.match(page, /const playSkills = skills\.filter\(\(skill\) => skill\.level > 0\)/);
   assert.match(page, /Только изученные/);

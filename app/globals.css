@@ -175,7 +175,7 @@ button { cursor: pointer; }
 .play-card-title { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 11px; padding-bottom: 7px; border-bottom: 1px solid #b9a99a; }
 .play-card-title > span { color: #632026; font: 700 15px/1 var(--serif); text-transform: uppercase; letter-spacing: .05em; }
 .play-card-title small { color: #7d7168; font-size: 8px; }
-.play-derived-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.play-derived-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .play-derived-grid > div { min-height: 62px; padding: 8px 5px; text-align: center; background: #ece3d7; border: 1px solid #cabbad; }
 .play-derived-grid span, .play-derived-grid small { display: block; }
 .play-derived-grid span { color: #766960; font-size: 7px; font-weight: 900; text-transform: uppercase; }

@@ -2298,6 +2298,7 @@ export default function Home() {
                   <div><span>Шаг</span><strong>{encumbered ? Math.max(0, character.pace - 2) : character.pace}</strong>{encumbered && <small>перегрузка</small>}</div>
                   <div><span>Бег</span><strong>{dieLabel(character.runningDie)}</strong></div>
                   <div><span>Фишки</span><strong>{character.sessionBennies}</strong><small>из {character.bennies}</small></div>
+                  <div><span>Флорины</span><strong>{character.florins || 0}</strong><small>наличные</small></div>
                 </div>
                 <div className="play-attributes">
                   {ATTRIBUTE_META.map(({ key, label, abbr }) => <div key={key}><span>{abbr}</span><b>{label}</b><strong>{dieLabel(character.attributes[key])}</strong></div>)}
