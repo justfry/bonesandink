@@ -1263,12 +1263,20 @@ function PipTrack({ count, label }: { count: number; label: string }) {
 }
 
 function AttributeDie({ die, current }: { die: Die; current: boolean }) {
+  const title = `${dieLabel(die)}${current ? ", текущая характеристика" : ""}`;
   return (
     <span
       className={`attribute-die die-d${die}${current ? " is-current" : ""}`}
-      aria-label={`${dieLabel(die)}${current ? ", текущая характеристика" : ""}`}
+      aria-label={title}
     >
-      <i>{die}</i>
+      <svg viewBox="0 0 32 32" role="img" aria-hidden="true" focusable="false">
+        {die === 4 && <><polygon className="die-svg-face" points="16,2 30,29 2,29" /><path className="die-svg-facet" d="M16 2 16 20M2 29l14-9 14 9" /></>}
+        {die === 6 && <><rect className="die-svg-face" x="2.5" y="2.5" width="27" height="27" rx="3" /><path className="die-svg-facet" d="M7 7h4M7 7v4M25 25h-4M25 25v-4" /></>}
+        {die === 8 && <><polygon className="die-svg-face" points="16,1.5 30,16 16,30.5 2,16" /><path className="die-svg-facet" d="M16 1.5 10.5 16 16 30.5M30 16H10.5L2 16" /></>}
+        {die === 10 && <><polygon className="die-svg-face" points="16,1.5 25,5.5 30,15 25.5,26 16,30.5 6.5,26 2,15 7,5.5" /><path className="die-svg-facet" d="M16 1.5 10 15 16 30.5M2 15h8l6-13.5M30 15H10l15.5 11" /></>}
+        {die === 12 && <><polygon className="die-svg-face" points="16,1 23.5,3 29,8.5 31,16 29,23.5 23.5,29 16,31 8.5,29 3,23.5 1,16 3,8.5 8.5,3" /><path className="die-svg-facet" d="m16 6 8.7 6.3-3.3 10.2H10.6L7.3 12.3 16 6ZM3 8.5l4.3 3.8M29 8.5l-4.3 3.8M23.5 29l-2.1-6.5M8.5 29l2.1-6.5" /></>}
+        <text className="die-svg-value" x="16" y={die === 4 ? "23.5" : "19.4"} textAnchor="middle">{die}</text>
+      </svg>
     </span>
   );
 }

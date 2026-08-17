@@ -179,9 +179,12 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /print-color-adjust: economy/);
   assert.match(css, /\.character-sheet \{[\s\S]*background: #fff !important;/);
   assert.match(css, /background-image: none !important/);
-  assert.match(css, /\.attribute-die\.die-d4/);
-  assert.match(css, /\.attribute-die\.die-d12/);
-  assert.match(css, /\.attribute-die\.is-current::after/);
+  assert.match(page, /<svg viewBox="0 0 32 32"/);
+  assert.match(page, /className="die-svg-face"/);
+  assert.match(page, /className="die-svg-facet"/);
+  assert.match(css, /\.die-svg-face/);
+  assert.match(css, /\.attribute-die\.is-current \.die-svg-face/);
+  assert.match(css, /\.hide-die-values \.die-svg-value/);
   assert.match(css, /\.big-stat-row \.blood-stat/);
   assert.match(css, /\.first-page-skills/);
   assert.match(css, /\.second-page-weapons/);
