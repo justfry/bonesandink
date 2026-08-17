@@ -704,20 +704,28 @@ details[open] summary::after { content: "−"; }
 .character-sheet::before {
   content: "";
   position: absolute;
-  inset: 2.5%;
+  inset: 2.65%;
   border: 1px solid rgba(79,60,44,.24);
   pointer-events: none;
 }
 .character-sheet::after {
   content: "";
   position: absolute;
-  inset: 3%;
+  inset: 3.05%;
   border: 1px solid rgba(125,31,36,.13);
   pointer-events: none;
 }
-.sheet-crop { position: absolute; width: 34px; height: 34px; top: 2.5%; z-index: 1; border-top: 2px solid #7f2529; }
-.sheet-crop.top-left { left: 2.5%; border-left: 2px solid #7f2529; }
-.sheet-crop.top-right { right: 2.5%; border-right: 2px solid #7f2529; }
+.renaissance-frame { position: absolute; inset: 2.05%; z-index: 3; border: 1px solid rgba(78,57,43,.75); pointer-events: none; }
+.renaissance-frame::before { content: ""; position: absolute; inset: 4px; border: 1px solid rgba(125,31,36,.3); }
+.frame-fleuron { position: absolute; display: grid; place-items: center; color: #762127; font: 21px/1 var(--serif); }
+.frame-fleuron.corner { width: 35px; height: 35px; }
+.frame-fleuron.top-left { top: -13px; left: -12px; transform: rotate(-38deg); }
+.frame-fleuron.top-right { top: -13px; right: -12px; transform: rotate(38deg); }
+.frame-fleuron.bottom-left { bottom: -13px; left: -12px; transform: rotate(-142deg); }
+.frame-fleuron.bottom-right { right: -12px; bottom: -13px; transform: rotate(142deg); }
+.frame-fleuron.midpoint { width: 32px; left: 50%; font-size: 17px; }
+.frame-fleuron.midpoint.top { top: -9px; transform: translateX(-50%); }
+.frame-fleuron.midpoint.bottom { bottom: -9px; transform: translateX(-50%) rotate(180deg); }
 
 .sheet-header { height: 9%; min-height: 0; display: grid; grid-template-columns: 66px 1fr 90px; gap: 12px; align-items: center; border-bottom: 2px solid #2f2924; position: relative; z-index: 2; }
 .sheet-header.compact { height: 8%; min-height: 0; }
@@ -829,50 +837,48 @@ details[open] summary::after { content: "−"; }
 .skills-print-grid small { color: #8a2a2e; font: 700 5px/1 var(--sans); }
 .skills-print-grid b { text-align: right; font-size: 8px; }
 
-.second-page-weapons { height: 17%; padding-top: 1.2%; }
+.second-page-weapons { height: 13%; padding-top: 1.2%; }
 .second-page-weapons table { height: calc(100% - 17px); }
 .second-page-weapons th, .second-page-weapons td { height: auto; }
-.language-gear-grid { height: 8.5%; display: grid; grid-template-columns: 1fr 30%; gap: 10px; padding-top: 1%; }
+.language-gear-grid { height: 8%; display: grid; grid-template-columns: 1fr 30%; gap: 10px; padding-top: 1%; }
 .languages-print p, .gear-print p { margin: 6px 0 0; font-size: 7px; line-height: 1.45; }
 .languages-print > small { color: #76695d; font-size: 5.5px; }
 .funds-print { color: #eee4d2; background: #4a3b34; padding: 8px; text-align: center; }
 .funds-print h3 { color: #eee4d2; border-color: #98847a; }
 .funds-print strong { display: block; margin-top: 9px; font-size: 20px; }
 .funds-print p { margin: 0; font-size: 6px; text-transform: uppercase; }
-.gear-print { height: 8%; padding-top: 1%; }
+.gear-print { height: 7%; padding-top: 1%; }
 
-.magic-print { height: 14%; padding-top: 1%; }
-.magic-print > div { height: calc(100% - 17px); display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 0 10px; margin-top: 4px; }
-.magic-print article { min-width: 0; min-height: 0; padding: 3px 4px; border-bottom: 1px dotted #a79788; }
-.magic-print article b, .magic-print article small, .magic-print article p { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.magic-print { height: 18%; padding-top: 1%; }
+.magic-tradition-strip { height: 18px; display: flex; gap: 5px 12px; align-items: center; margin-top: 3px; overflow: hidden; color: #6f6259; border-bottom: 1px solid #b7a796; font: 5px/1 var(--sans); white-space: nowrap; }
+.magic-tradition-strip span { overflow: hidden; text-overflow: ellipsis; }
+.magic-tradition-strip b { color: #7d2227; text-transform: uppercase; }
+.magic-print-grid { height: calc(100% - 37px); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr); gap: 0 10px; }
+.magic-print article { min-width: 0; min-height: 0; padding: 3px 4px; border-bottom: 1px dotted #a79788; overflow: hidden; }
+.magic-print article header { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; }
+.magic-print article b, .magic-print article em, .magic-print article small, .magic-print article p { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .magic-print article b { font-size: 6.5px; }
+.magic-print article em { flex: 0 0 auto; color: #81262a; font: 700 4.5px/1 var(--sans); text-transform: uppercase; }
 .magic-print article small { margin-top: 1px; color: #81262a; font: 700 4.7px/1.15 var(--sans); }
 .magic-print article p { margin: 2px 0 0; color: #6b6058; font-size: 5px; }
-.sheet-two.has-powers .second-page-weapons { height: 13%; }
-.sheet-two.has-powers .language-gear-grid { height: 8%; }
-.sheet-two.has-powers .gear-print { height: 7%; }
-.sheet-two.has-powers .second-page-appearance { height: 6%; }
-.sheet-two.has-powers .biography-print { height: 19%; }
-.sheet-two.has-powers .biography-print article { min-height: 0; }
-.sheet-two.has-powers .arcana-note-grid { height: 6%; }
-.sheet-two.has-powers .wound-log { height: 5%; }
+.magic-print-empty { opacity: .48; }
 
-.second-page-appearance { height: 7%; padding-top: 1%; }
+.second-page-appearance { height: 6%; padding-top: 1%; }
 .second-page-appearance > div { height: calc(100% - 14px); }
 .second-page-appearance > div { padding-top: 4px; }
 .second-page-appearance > div p { margin-top: 0; }
 
-.biography-print { height: 27%; padding-top: 1%; }
+.biography-print { height: 18%; padding-top: 1%; }
 .biography-print > div { height: calc(100% - 18px); display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 5px 9px; margin-top: 6px; }
 .biography-print article { min-height: 0; padding: 5px; background: rgba(255,255,255,.17); border: 1px solid #b9a997; overflow: hidden; }
 .biography-print article small { color: #81262a; font: 700 5.5px/1 var(--sans); text-transform: uppercase; letter-spacing: .07em; }
 .biography-print article p { margin: 4px 0 0; font-size: 6.2px; line-height: 1.35; }
 
-.arcana-note-grid { height: 8.5%; display: grid; grid-template-columns: 30% 1fr; gap: 10px; padding-top: 1%; }
+.arcana-note-grid { height: 7%; display: grid; grid-template-columns: 30% 1fr; gap: 10px; padding-top: 1%; }
 .arcana-print, .notes-print { padding: 6px; border: 1px solid #b5a38f; }
 .arcana-print h3, .notes-print h3 { color: #81262a; font-size: 6px; }
 .arcana-print p, .notes-print p { margin: 5px 0 0; font-size: 6.2px; line-height: 1.3; }
-.wound-log { height: 7%; padding-top: .8%; position: relative; z-index: 1; }
+.wound-log { height: 6%; padding-top: .8%; position: relative; z-index: 1; }
 .wound-log > div { height: calc(100% - 18px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 7px; }
 .wound-log span { height: 100%; min-height: 14px; border-bottom: 1px dotted #9e8c7c; }
 .notes-page section { height: 78%; padding-top: 4%; }
@@ -1001,7 +1007,9 @@ details[open] summary::after { content: "−"; }
   }
   .character-sheet::before { border-color: #777 !important; }
   .character-sheet::after { display: none !important; }
-  .sheet-crop { border-color: #000 !important; }
+  .renaissance-frame,
+  .renaissance-frame::before { border-color: #333 !important; }
+  .frame-fleuron { color: #000 !important; }
   .sheet-header-portrait,
   .sheet-brand b {
     border-color: #000 !important;

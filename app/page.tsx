@@ -1281,6 +1281,19 @@ function AttributeDie({ die, current }: { die: Die; current: boolean }) {
   );
 }
 
+function SheetOrnaments() {
+  return (
+    <div className="renaissance-frame" aria-hidden="true">
+      <span className="frame-fleuron corner top-left">❧</span>
+      <span className="frame-fleuron corner top-right">❦</span>
+      <span className="frame-fleuron corner bottom-left">❦</span>
+      <span className="frame-fleuron corner bottom-right">❧</span>
+      <span className="frame-fleuron midpoint top">❦</span>
+      <span className="frame-fleuron midpoint bottom">❦</span>
+    </div>
+  );
+}
+
 function traitGuideDetail(guide: TraitGuide, severity?: TraitEntry["severity"]) {
   if (severity === "major" && guide.majorDetail) return guide.majorDetail;
   if (severity === "minor" && guide.minorDetail) return guide.minorDetail;
@@ -2815,7 +2828,7 @@ export default function Home() {
 
           <div className="sheet-stack">
             <article className="character-sheet sheet-one">
-              <div className="sheet-crop top-left" /><div className="sheet-crop top-right" />
+              <SheetOrnaments />
               <header className="sheet-header sheet-header-primary">
                 <div className="sheet-header-portrait">
                   {character.portrait && character.printPortrait && <img style={{ objectPosition: `${character.portraitX}% ${character.portraitY}%`, transform: `scale(${character.portraitZoom / 100})` }} src={character.portrait} alt="" />}
@@ -2902,8 +2915,8 @@ export default function Home() {
               <footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист I / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
 
-            <article className={`character-sheet sheet-two ${character.powers.length ? "has-powers" : ""}`}>
-              <div className="sheet-crop top-left" /><div className="sheet-crop top-right" />
+            <article className="character-sheet sheet-two">
+              <SheetOrnaments />
               <header className="sheet-header compact">
                 <div className="folio">II</div>
                 <div className="sheet-title"><small>ДОСЬЕ РЕКОНКИСТЫ / II</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div>
@@ -2940,25 +2953,35 @@ export default function Home() {
                 <p>{[...character.inventory.map((item) => `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ""}`), character.gear].filter(Boolean).join("; ") || "-"}</p>
               </section>
 
-              {character.powers.length > 0 && (
-                <section className="sheet-section magic-print">
-                  <h3><span>X</span> Мистика и силы <small>без пунктов силы</small></h3>
-                  <div>{character.powers.slice(0, 8).map((power) => {
+              <section className="sheet-section magic-print">
+                <h3><span>X</span> Мистика, рецепты и устройства <small>{character.powers.length}/8 записей · без ПС</small></h3>
+                <div className="magic-tradition-strip">
+                  {displayedArcaneTraditions.length ? displayedArcaneTraditions.map((tradition) => {
+                    const traditionSkill = skills.find((skill) => skill.id === ARCANE_TRADITIONS[tradition].skillId);
+                    return <span key={tradition}><b>{ARCANE_TRADITIONS[tradition].label}</b> · {traditionSkill?.name || "Навык"} {dieLabel(traditionSkill?.level || 0)}</span>;
+                  }) : <span><b>Мистический дар не выбран</b> · место для будущих сил</span>}
+                </div>
+                <div className="magic-print-grid">
+                  {Array.from({ length: 8 }).map((_, index) => {
+                    const power = character.powers[index];
+                    if (!power) return <article className="magic-print-empty" key={`magic-blank-${index}`}><b>Сила / рецепт / устройство</b><small>Традиция · активация · дистанция · длительность</small><p /></article>;
                     const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
                     if (!guide) return null;
-                    const penalty = power.tradition === "alchemy" || guide.cost === null ? "±0" : `−${Math.floor(guide.cost / 2)}`;
-                    return <article key={power.id}><b>{power.name}</b><small>{ARCANE_TRADITIONS[power.tradition].label} · {guide.cost === null ? "особ." : `${guide.cost} ПС`} · проверка {penalty} · {guide.range} · {guide.duration}</small><p>{power.trapping}</p></article>;
-                  })}</div>
-                </section>
-              )}
+                    const activation = power.tradition === "alchemy"
+                      ? `смесь ${power.recipeCost} фл. · готово ${power.prepared}`
+                      : `${guide.cost === null ? "особая активация" : `проверка -${Math.floor(guide.cost / 2)}`}${power.tradition === "witchcraft" && power.active ? " · поддерживается" : ""}${power.tradition === "weird-science" && power.broken ? " · сломано" : ""}`;
+                    return <article key={power.id}><header><b>{power.name}</b><em>{ARCANE_TRADITIONS[power.tradition].label}</em></header><small>{activation} · {guide.range} · {guide.duration}</small><p>{guide.detail}{power.trapping ? ` - ${power.trapping}` : ""}</p></article>;
+                  })}
+                </div>
+              </section>
 
               <section className="appearance-print second-page-appearance">
-                <h3><span>{character.powers.length ? "XI" : "X"}</span> Описание и приметы</h3>
+                <h3><span>XI</span> Описание и приметы</h3>
                 <div><p>{character.appearance || "Место для примет и слов очевидцев."}</p></div>
               </section>
 
               <section className="sheet-section biography-print">
-                <h3><span>{character.powers.length ? "XII" : "XI"}</span> Человек под маской</h3>
+                <h3><span>XII</span> Человек под маской</h3>
                 <div>
                   <article><small>Родина и прошлое</small><p>{character.homeland || "-"}</p></article>
                   <article><small>Вера или убеждение</small><p>{character.belief || "-"}</p></article>
@@ -2981,7 +3004,7 @@ export default function Home() {
 
               <footer className="sheet-footer"><span>SWADE - адаптация кампании</span><b>Θ</b><span>Лист II / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
-            {character.printExtraNotesPage && <article className="character-sheet notes-page"><div className="sheet-crop top-left" /><div className="sheet-crop top-right" /><header className="sheet-header compact"><div className="folio">III</div><div className="sheet-title"><small>ПОЛЕВОЙ ЖУРНАЛ / III</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div><div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div></header><section><h3>Заметки, улики и долги</h3>{Array.from({ length: 28 }).map((_, index) => <i key={index} />)}</section><footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист III / III</span></footer></article>}
+            {character.printExtraNotesPage && <article className="character-sheet notes-page"><SheetOrnaments /><header className="sheet-header compact"><div className="folio">III</div><div className="sheet-title"><small>ПОЛЕВОЙ ЖУРНАЛ / III</small><h2>{character.name || "ИМЯ ПЕРСОНАЖА"}</h2></div><div className="sheet-brand"><b>Θ</b><span>ULTIMA<br />FORSAN</span></div></header><section><h3>Заметки, улики и долги</h3>{Array.from({ length: 28 }).map((_, index) => <i key={index} />)}</section><footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист III / III</span></footer></article>}
           </div>
         </section>
       </div>

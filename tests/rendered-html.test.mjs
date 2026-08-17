@@ -170,6 +170,10 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /legacyName: "Кукла"/);
   assert.match(page, /legacyName: "Волна"/);
   assert.match(page, /className="sheet-section magic-print"/);
+  assert.match(page, /Мистика, рецепты и устройства/);
+  assert.match(page, /className="magic-print-grid"/);
+  assert.match(page, /function SheetOrnaments/);
+  assert.match(page, /className="renaissance-frame"/);
   assert.match(page, /printExtraNotesPage/);
   assert.match(page, /portraitZoom/);
   assert.match(page, /const WEAPON_PURCHASE_DATA/);
@@ -213,6 +217,9 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.play-power-list/);
   assert.match(css, /\.magic-rules-intro/);
   assert.match(css, /\.magic-print/);
+  assert.match(css, /\.magic-tradition-strip/);
+  assert.match(css, /\.renaissance-frame/);
+  assert.match(css, /\.frame-fleuron/);
   assert.match(page, /hydra-logo-full-black\.svg/);
   assert.match(css, /\.site-logo img/);
   assert.match(page, /function PlayNumberStepper/);
