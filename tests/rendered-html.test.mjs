@@ -155,10 +155,14 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /type ArcaneTradition = "alchemy" \| "witchcraft" \| "weird-science"/);
   assert.match(page, /const ARCANE_TRADITIONS/);
   assert.match(page, /const POWER_GUIDES: PowerGuide\[\]/);
-  assert.match(page, /Правило мира: без пунктов силы/);
+  assert.match(page, /Без пунктов силы/);
   assert.match(page, /function rollExplodingDie/);
   assert.match(page, /const activatePower/);
-  assert.match(page, /Готовых доз/);
+  assert.match(page, /recipeCost/);
+  assert.match(page, /const setPreparedPowerQuantity/);
+  assert.match(page, /florins: String\(florins - difference \* recipeCost\)/);
+  assert.match(page, /Приготовление сразу меняет остаток флоринов/);
+  assert.match(page, /приготовить за/);
   assert.match(page, /Устройство сломано/);
   assert.match(page, /witchcraftBacklash/);
   assert.match(page, /legacyName: "Ночное зрение"/);

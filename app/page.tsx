@@ -57,6 +57,7 @@ type KnownPower = {
   tradition: ArcaneTradition;
   name: string;
   trapping: string;
+  recipeCost: number;
   prepared: number;
   active: boolean;
   broken: boolean;
@@ -899,6 +900,7 @@ function restoreCharacter(value?: Partial<Character>): Character {
               id: power.id || `power-${makeId()}`,
               name: guide.name,
               trapping: typeof power.trapping === "string" ? power.trapping : guide.manifestations[power.tradition] || "",
+              recipeCost: Math.max(guide.cost || 0, Math.floor(safeNumber(power.recipeCost, guide.cost || 0))),
               prepared: Math.max(0, safeNumber(power.prepared)),
               active: Boolean(power.active),
               broken: Boolean(power.broken),
@@ -1824,6 +1826,7 @@ export default function Home() {
       tradition,
       name: guide.name,
       trapping: guide.manifestations[tradition] || "",
+      recipeCost: guide.cost || 0,
       prepared: 0,
       active: false,
       broken: false,
@@ -1835,9 +1838,32 @@ export default function Home() {
   };
 
   const removePower = (id: string) => {
-    setCharacter((current) => ({ ...current, powers: current.powers.filter((power) => power.id !== id) }));
+    setCharacter((current) => {
+      const power = current.powers.find((item) => item.id === id);
+      const refund = power?.tradition === "alchemy" ? power.prepared * Math.max(0, Math.floor(power.recipeCost)) : 0;
+      return { ...current, florins: String(safeNumber(current.florins) + refund), powers: current.powers.filter((item) => item.id !== id) };
+    });
     setPowerCosts((current) => { const next = { ...current }; delete next[id]; return next; });
     setPowerRolls((current) => { const next = { ...current }; delete next[id]; return next; });
+  };
+
+  const setPreparedPowerQuantity = (id: string, requestedQuantity: number) => {
+    setCharacter((current) => {
+      const power = current.powers.find((item) => item.id === id && item.tradition === "alchemy");
+      const guide = power ? POWER_GUIDES.find((item) => item.id === power.guideId) : undefined;
+      if (!power || !guide) return current;
+      const recipeCost = Math.max(guide.cost || 0, Math.floor(power.recipeCost));
+      const florins = Math.max(0, safeNumber(current.florins));
+      const affordableMaximum = power.prepared + Math.floor(florins / Math.max(1, recipeCost));
+      const quantity = Math.min(Math.max(0, Math.floor(requestedQuantity)), affordableMaximum);
+      const difference = quantity - power.prepared;
+      if (!difference) return current;
+      return {
+        ...current,
+        florins: String(florins - difference * recipeCost),
+        powers: current.powers.map((item) => item.id === id ? { ...item, prepared: quantity } : item),
+      };
+    });
   };
 
   const activatePower = (power: KnownPower) => {
@@ -1846,7 +1872,9 @@ export default function Home() {
     const skill = skills.find((item) => item.id === tradition.skillId);
     if (!guide || power.broken || (power.tradition === "alchemy" && power.prepared <= 0)) return;
 
-    const selectedCost = Math.max(guide.cost || 0, Math.floor(powerCosts[power.id] ?? guide.cost ?? 0));
+    const selectedCost = power.tradition === "alchemy"
+      ? Math.max(guide.cost || 0, Math.floor(power.recipeCost))
+      : Math.max(guide.cost || 0, Math.floor(powerCosts[power.id] ?? guide.cost ?? 0));
     const maintainedPenalty = power.tradition === "witchcraft"
       ? Math.max(0, activeWitchcraftPowers - (power.active ? 1 : 0))
       : 0;
@@ -2289,14 +2317,16 @@ export default function Home() {
 
               {(displayedArcaneTraditions.length > 0 || character.powers.length > 0) && (
                 <section className="play-card play-magic">
-                  <div className="play-card-title"><span>Мистика и силы</span><small>Правило мира: без пунктов силы</small></div>
+                  <div className="play-card-title"><span>Мистика и силы</span><small>Без пунктов силы · {character.florins || 0} фл.</small></div>
                   {character.witchcraftBacklash && <label className="magic-strain"><input type="checkbox" checked={character.witchcraftBacklash} onChange={(event) => update("witchcraftBacklash", event.target.checked)} /> Ведьмовство временно снижено на ступень</label>}
                   {character.powers.length ? <div className="play-power-list">{character.powers.map((power) => {
                     const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
                     if (!guide) return null;
                     const tradition = ARCANE_TRADITIONS[power.tradition];
                     const skill = skills.find((item) => item.id === tradition.skillId);
-                    const currentCost = Math.max(guide.cost || 0, powerCosts[power.id] ?? guide.cost ?? 0);
+                    const currentCost = power.tradition === "alchemy"
+                      ? Math.max(guide.cost || 0, power.recipeCost)
+                      : Math.max(guide.cost || 0, powerCosts[power.id] ?? guide.cost ?? 0);
                     const maintainedPenalty = power.tradition === "witchcraft" ? Math.max(0, activeWitchcraftPowers - (power.active ? 1 : 0)) : 0;
                     const activationPenalty = power.tradition === "alchemy" ? 0 : -Math.floor(currentCost / 2) - maintainedPenalty;
                     const result = powerRolls[power.id];
@@ -2306,8 +2336,8 @@ export default function Home() {
                         <p>{power.trapping}</p>
                         <div className="play-power-meta"><span>{guide.range}</span><span>{guide.duration}</span><span>{guide.detail}</span></div>
                         <div className="play-power-controls">
-                          <label><span>{power.tradition === "alchemy" ? "Цена смеси" : "Стоимость сейчас"}</span><input type="number" min={guide.cost || 0} value={currentCost} onChange={(event) => setPowerCosts((current) => ({ ...current, [power.id]: Math.max(guide.cost || 0, safeNumber(event.target.value)) }))} /></label>
-                          {power.tradition === "alchemy" && <label><span>Готовых доз</span><input type="number" min="0" value={power.prepared} onChange={(event) => updatePower(power.id, { prepared: Math.max(0, safeNumber(event.target.value)) })} /></label>}
+                          <label><span>{power.tradition === "alchemy" ? "Цена рецепта" : "Стоимость сейчас"}</span><input type="number" min={guide.cost || 0} value={currentCost} disabled={power.tradition === "alchemy" && power.prepared > 0} title={power.tradition === "alchemy" && power.prepared > 0 ? "Сначала используйте или верните готовые дозы" : undefined} onChange={(event) => { if (!Number.isFinite(event.currentTarget.valueAsNumber)) return; if (power.tradition === "alchemy") updatePower(power.id, { recipeCost: Math.max(guide.cost || 0, Math.floor(event.currentTarget.valueAsNumber)) }); else setPowerCosts((current) => ({ ...current, [power.id]: Math.max(guide.cost || 0, Math.floor(event.currentTarget.valueAsNumber)) })); }} /></label>
+                          {power.tradition === "alchemy" && <div className="alchemy-dose-field"><span>Дозы · {currentCost} фл.</span><div><button type="button" aria-label={`Вернуть ингредиенты: ${power.name}`} title={`Вернуть ингредиенты и ${currentCost} флоринов`} disabled={power.prepared <= 0} onClick={() => setPreparedPowerQuantity(power.id, power.prepared - 1)}>−</button><strong>{power.prepared}</strong><button type="button" aria-label={`Приготовить дозу: ${power.name}`} title={`Приготовить дозу за ${currentCost} флоринов`} disabled={safeNumber(character.florins) < currentCost} onClick={() => setPreparedPowerQuantity(power.id, power.prepared + 1)}>+</button></div></div>}
                           <button type="button" disabled={power.broken || (power.tradition === "alchemy" && power.prepared <= 0)} onClick={() => activatePower(power)}>Бросить {skill?.name || tradition.label} {dieLabel(skill?.level || 0)}</button>
                         </div>
                         <div className="play-power-status">
@@ -2708,7 +2738,7 @@ export default function Home() {
                     <div className="power-rules-line"><span>{guide.cost === null ? "ПС: особ." : `ПС: ${guide.cost}`}</span><span>{guide.range}</span><span>{guide.duration}</span></div>
                     <p>{guide.detail}</p>
                     <label><span>Проявление силы</span><textarea value={power.trapping} maxLength={240} onChange={(event) => updatePower(power.id, { trapping: event.target.value })} /></label>
-                    {power.tradition === "alchemy" && <label className="prepared-editor"><span>Готовых доз сейчас</span><input type="number" min="0" value={power.prepared} onChange={(event) => updatePower(power.id, { prepared: Math.max(0, safeNumber(event.target.value)) })} /></label>}
+                    {power.tradition === "alchemy" && <div className="alchemy-prep-editor"><label><span>Цена рецепта за дозу</span><input type="number" min={guide.cost || 0} value={Math.max(guide.cost || 0, power.recipeCost)} disabled={power.prepared > 0} title={power.prepared > 0 ? "Сначала используйте или верните готовые дозы" : undefined} onChange={(event) => { if (Number.isFinite(event.currentTarget.valueAsNumber)) updatePower(power.id, { recipeCost: Math.max(guide.cost || 0, Math.floor(event.currentTarget.valueAsNumber)) }); }} /></label><div><span>Готово: <b>{power.prepared}</b></span><button type="button" disabled={power.prepared <= 0} onClick={() => setPreparedPowerQuantity(power.id, power.prepared - 1)}>− вернуть {power.recipeCost} фл.</button><button type="button" disabled={safeNumber(character.florins) < power.recipeCost} onClick={() => setPreparedPowerQuantity(power.id, power.prepared + 1)}>+ приготовить за {power.recipeCost} фл.</button></div><small>Приготовление сразу меняет остаток флоринов. Использованная доза денег не возвращает.</small></div>}
                   </article>
                 );
               })}</div>}

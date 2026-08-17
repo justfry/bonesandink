@@ -240,12 +240,16 @@ button { cursor: pointer; }
 .play-power-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; color: #796d64; font-size: 8px; }
 .play-power-meta span:last-child { flex-basis: 100%; color: #4f4741; }
 .play-power-controls { display: grid; grid-template-columns: 96px 96px 1fr; gap: 6px; align-items: end; margin-top: 9px; }
-.play-power-controls label span { display: block; margin-bottom: 3px; color: #756960; font-size: 7px; font-weight: 800; text-transform: uppercase; }
+.play-power-controls label span, .alchemy-dose-field > span { display: block; margin-bottom: 3px; color: #756960; font-size: 7px; font-weight: 800; text-transform: uppercase; }
 .play-power-controls input, .play-power-controls button { width: 100%; height: 32px; padding: 0 7px; border: 1px solid #bdaa9b; }
 .play-power-controls input { background: #fffaf2; }
+.play-power-controls input:disabled { color: #8a7d73; background: #e4dbd0; cursor: not-allowed; }
 .play-power-controls button { color: #fff8ed; background: #762127; font-size: 8px; font-weight: 800; }
 .play-power-controls button:disabled { opacity: .4; cursor: not-allowed; }
 .play-power-controls label + button { grid-column: 3; }
+.alchemy-dose-field > div { display: grid; grid-template-columns: 30px 1fr 30px; }
+.alchemy-dose-field button { padding: 0; }
+.alchemy-dose-field strong { height: 32px; display: grid; place-items: center; color: #302a26; background: #fffaf2; border-top: 1px solid #bdaa9b; border-bottom: 1px solid #bdaa9b; font-size: 11px; }
 .play-power-status { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; color: #554c46; font-size: 8px; font-weight: 800; }
 .power-roll-result { display: flex; justify-content: space-between; gap: 9px; margin-top: 8px; padding: 7px 8px; color: #2f4437; background: #dde6dd; border-left: 3px solid #607a68; font-size: 8px; }
 .power-roll-result.is-backlash { color: #6f191f; background: #ead5d0; border-left-color: #8b252a; }
@@ -631,7 +635,14 @@ details[open] summary::after { content: "−"; }
 .known-power-list textarea, .known-power-list input { width: 100%; color: #2d2723; background: #fffaf2; border: 1px solid #c4b5a7; }
 .known-power-list textarea { min-height: 56px; padding: 7px; resize: vertical; font-size: 8px; line-height: 1.4; }
 .known-power-list input { height: 31px; padding: 0 7px; }
-.known-power-list .prepared-editor { margin-top: 7px; }
+.alchemy-prep-editor { margin-top: 7px; padding-top: 7px; border-top: 1px solid #d0c2b5; }
+.alchemy-prep-editor > label > span { display: block; margin-bottom: 4px; color: #786b62; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+.alchemy-prep-editor > label input:disabled { color: #8a7c72; background: #e1d8ce; cursor: not-allowed; }
+.alchemy-prep-editor > div { display: grid; grid-template-columns: 78px 1fr 1.4fr; gap: 5px; align-items: center; margin-top: 6px; }
+.alchemy-prep-editor > div > span { color: #665b53; font-size: 8px; }
+.alchemy-prep-editor button { min-height: 29px; padding: 4px 6px; color: #762127; background: #fffaf2; border: 1px solid #bda99a; font-size: 7px; font-weight: 800; }
+.alchemy-prep-editor button:disabled { opacity: .42; cursor: not-allowed; }
+.alchemy-prep-editor > small { display: block; margin-top: 5px; color: #7d7067; font-size: 7px; line-height: 1.35; }
 .session-state > p, .print-settings > p { margin: 0 0 13px; color: #786e66; font-size: 9px; }
 .state-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .state-grid label { padding: 8px; background: #e9e1d6; border: 1px solid #d0c3b6; }
@@ -962,10 +973,11 @@ details[open] summary::after { content: "−"; }
   .play-traits-grid, .play-skills-grid { grid-template-columns: 1fr; }
   .play-weapons article { grid-template-columns: 1fr; }
   .play-power-controls { grid-template-columns: 1fr 1fr; }
-  .play-power-controls button, .play-power-controls label + button { grid-column: 1 / -1; }
+  .play-power-controls > button, .play-power-controls label + button { grid-column: 1 / -1; }
   .power-roll-result { align-items: flex-start; flex-direction: column; }
   .power-roll-result span { text-align: left; }
   .known-power-list { grid-template-columns: 1fr; }
+  .alchemy-prep-editor > div { grid-template-columns: 1fr; }
   .edit-mode-banner { align-items: flex-start; flex-direction: column; }
 }
 
