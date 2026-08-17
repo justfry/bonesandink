@@ -6,6 +6,7 @@ type Die = 0 | 4 | 6 | 8 | 10 | 12;
 type AttributeKey = "agility" | "smarts" | "spirit" | "strength" | "vigor";
 type Rank = "Новичок" | "Закалённый" | "Ветеран" | "Герой" | "Легенда";
 type AdvanceType = "edge" | "skills" | "attribute" | "hindrance";
+type ArcaneTradition = "alchemy" | "witchcraft" | "weird-science";
 
 type Skill = {
   id: string;
@@ -48,6 +49,38 @@ type Weapon = {
 type WeaponGuide = Omit<Weapon, "id"> & {
   category: "Стрелковое" | "Метательное" | "Тычковое" | "Древковое" | "Топоры" | "Клинки" | "Булавы";
   detail: string;
+};
+
+type KnownPower = {
+  id: string;
+  guideId: string;
+  tradition: ArcaneTradition;
+  name: string;
+  trapping: string;
+  prepared: number;
+  active: boolean;
+  broken: boolean;
+};
+
+type PowerGuide = {
+  id: string;
+  name: string;
+  legacyName?: string;
+  rank: Rank;
+  cost: number | null;
+  range: string;
+  duration: string;
+  detail: string;
+  manifestations: Partial<Record<ArcaneTradition, string>>;
+};
+
+type PowerRollResult = {
+  trait: string;
+  wild: string;
+  total: number;
+  modifier: number;
+  outcome: string;
+  backlash: boolean;
 };
 
 type ArmorArea = "head" | "torso" | "arms" | "legs";
@@ -96,6 +129,7 @@ type Character = {
   languages: string;
   edges: TraitEntry[];
   hindrances: TraitEntry[];
+  powers: KnownPower[];
   weapons: Weapon[];
   inventory: InventoryItem[];
   gear: string;
@@ -112,6 +146,7 @@ type Character = {
   fatigue: number;
   shaken: boolean;
   infected: boolean;
+  witchcraftBacklash: boolean;
   sessionBennies: number;
   plagueExposure: number;
   ammoSpent: Record<string, number>;
@@ -122,7 +157,7 @@ type Character = {
 
 type AdvanceSnapshot = Pick<Character,
   "advances" | "edgeAdvances" | "skillAdvancePoints" | "attributeAdvancePoints" |
-  "attributeRaiseRanks" | "retiredHindrancePoints" | "attributes" | "edges" | "hindrances"
+  "attributeRaiseRanks" | "retiredHindrancePoints" | "attributes" | "edges" | "hindrances" | "powers"
 > & { skills: Skill[] };
 
 type AdvanceRecord = {
@@ -171,6 +206,10 @@ const SWADE_ADAPTATIONS = [
   ["Уличное чутьё (навык)", "«Уличное чутьё»; при требовании — черта"],
   ["Знание (военное дело)", "Военное дело"],
   ["Харизма", "Убеждение / Выступление по ситуации"],
+  ["Ночное зрение (сила)", "Совиное чутьё"],
+  ["Кукла (сила)", "Марионетка"],
+  ["Волна (сила)", "Смерч"],
+  ["Проворство (сила)", "модификатор «Ускорения»"],
 ] as const;
 const LEGACY_SKILL_TARGETS = new Map([
   ["маскировка", "stealth"],
@@ -183,6 +222,71 @@ const LEGACY_SKILL_TARGETS = new Map([
   ["знание (военное дело)", "battle"],
   ["уличное чутьё", "common"],
 ]);
+
+const ARCANE_TRADITIONS: Record<ArcaneTradition, {
+  label: string;
+  edgeName: string;
+  skillId: string;
+  initialPowers: number;
+  rules: string;
+}> = {
+  alchemy: {
+    label: "Алхимия",
+    edgeName: "Мистический дар (алхимия)",
+    skillId: "alchemy",
+    initialPowers: 3,
+    rules: "Зелье готовится по часу за ранг силы и стоит 1 флорин за каждый базовый ПС. При активации штраф за стоимость и поддержание не применяется.",
+  },
+  witchcraft: {
+    label: "Ведьмовство",
+    edgeName: "Мистический дар (ведьмовство)",
+    skillId: "witchcraft",
+    initialPowers: 2,
+    rules: "Активация получает штраф, равный половине стоимости силы (округление вниз), и ещё −1 за каждую поддерживаемую силу.",
+  },
+  "weird-science": {
+    label: "Безумная наука",
+    edgeName: "Мистический дар (безумная наука)",
+    skillId: "weird-science",
+    initialPowers: 2,
+    rules: "Каждая сила — отдельное устройство. Штраф равен половине стоимости силы, но штрафа за поддержание нет; единица на кости навыка ломает устройство и наносит 2d6 урона.",
+  },
+};
+
+const ARCANE_TRADITION_ORDER: ArcaneTradition[] = ["alchemy", "witchcraft", "weird-science"];
+
+const POWER_GUIDES: PowerGuide[] = [
+  { id: "armor", name: "Доспех", rank: "Новичок", cost: 1, range: "СМК", duration: "5 раундов", detail: "+2 брони; при подъёме вместо этого +2 к Стойкости.", manifestations: { alchemy: "Мазь или зелье, делающее кожу жёсткой.", "weird-science": "Складная кираса из тонкой фольги." } },
+  { id: "healing", name: "Исцеление", rank: "Новичок", cost: 3, range: "Касание", duration: "Мгновенно", detail: "Лечит одну свежую рану, а при подъёме — две.", manifestations: { alchemy: "Панацея, которая не способна вылечить Чуму.", witchcraft: "Народная медицина и травничество; применение занимает 10 минут." } },
+  { id: "low-light-vision", name: "Совиное чутьё", legacyName: "Ночное зрение", rank: "Новичок", cost: 1, range: "СМК", duration: "1 час", detail: "Игнорирует до 4 пунктов штрафа за темноту, до 6 при подъёме.", manifestations: { alchemy: "Зелье для зрения; действует на одну цель.", "weird-science": "Линзы, усиливающие доступный свет." } },
+  { id: "blind", name: "Ослепление", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "Налагает −2/−4 на проверки, связанные со зрением.", manifestations: { alchemy: "Фосфорная смесь, вспыхивающая при контакте с воздухом.", witchcraft: "Ослепляющий свет или жгучий порошок; дистанция 3/6/12.", "weird-science": "Пиротехника или устройство из призматических линз." } },
+  { id: "relief", name: "Поддержка", rank: "Новичок", cost: 1, range: "СМК", duration: "Мгновенно", detail: "Снимает отдельные состояния либо помогает игнорировать ранения и усталость.", manifestations: { alchemy: "Лекарство и стимулирующий препарат.", witchcraft: "Настойки и отвары из трав." } },
+  { id: "burst", name: "Поток", rank: "Новичок", cost: 2, range: "Конус", duration: "Мгновенно", detail: "Наносит 2d6 урона всем целям в конусном шаблоне.", manifestations: { alchemy: "Меха, выдувающие воспламеняющуюся смесь.", witchcraft: "Трюк уличных артистов с языком пламени." } },
+  { id: "light-darkness", name: "Свет / тьма", rank: "Новичок", cost: 2, range: "СМК", duration: "10 минут", detail: "Создаёт или убирает освещение.", manifestations: { alchemy: "Светящаяся смесь или дым; источником служит сосуд.", witchcraft: "Порошки и пары бродячих артистов.", "weird-science": "Особый фонарь или генератор дыма." } },
+  { id: "confusion", name: "Смятение", rank: "Новичок", cost: 1, range: "СМК", duration: "Особая", detail: "Делает цель отвлечённой и уязвимой.", manifestations: { alchemy: "Эфирные пары, вызывающие галлюцинации; одна цель.", witchcraft: "Наркотики и ядовитый порошок; дистанция 3/6/12." } },
+  { id: "fear", name: "Ужас", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "Заставляет цель пройти проверку Храбрости.", manifestations: { alchemy: "Пары, вызывающие галлюцинации и панику.", witchcraft: "Чревовещание и пугающие жесты." } },
+  { id: "boost-lower-trait", name: "Усилить / ослабить параметр", rank: "Новичок", cost: 3, range: "СМК", duration: "5 раундов / мгновенно", detail: "Повышает или понижает выбранный навык или характеристику.", manifestations: { alchemy: "Отвар, лекарство, наркотик или яд; эффект выбирается при приготовлении.", witchcraft: "Внушение, подстрекательство или угроза." } },
+  { id: "speed", name: "Замедление / ускорение", legacyName: "Ускорение / Проворство", rank: "Закалённый", cost: 2, range: "СМК", duration: "Мгновенно / 5 раундов", detail: "Меняет скорость передвижения и координацию; прежняя «Проворство» стала модификатором ускорения.", manifestations: { alchemy: "Стимулятор, учащающий сердцебиение и обостряющий рефлексы.", "weird-science": "Пневматические сапоги и гетры на пружинах." } },
+  { id: "blast", name: "Взрыв", rank: "Закалённый", cost: 3, range: "СМК ×2", duration: "Мгновенно", detail: "Наносит 2d6 урона в среднем шаблоне.", manifestations: { alchemy: "Крайне нестабильная взрывчатая смесь." } },
+  { id: "invisibility", name: "Невидимость", rank: "Закалённый", cost: 5, range: "СМК", duration: "5 раундов", detail: "Делает цель невидимой: −4/−6 на действия против неё.", manifestations: { alchemy: "Преломляющий порошок; действует лишь на одну цель." } },
+  { id: "stun", name: "Оглушение", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "Оглушает цель.", manifestations: { alchemy: "Взрывчатая смесь, поражающая всех поблизости.", witchcraft: "Большая хлопушка из бумаги и пороха; дистанция 3/6/12.", "weird-science": "Фейерверки и хлопушки со вспышками и взрывами." } },
+  { id: "slumber", name: "Сон", rank: "Закалённый", cost: 2, range: "СМК", duration: "1 час", detail: "Усыпляет цель.", manifestations: { alchemy: "Хрустальный шарик со снотворными парами; не действует на мертвецов.", witchcraft: "Испарения или ткань, пропитанная снотворным." } },
+  { id: "puppet", name: "Марионетка", legacyName: "Кукла", rank: "Ветеран", cost: 3, range: "СМК", duration: "5 раундов", detail: "При встречной проверке против Характера позволяет управлять целью.", manifestations: { alchemy: "Сильный эфирный пар, воздействующий на разум.", witchcraft: "Гипноз, внушение и симпатическая кукла." } },
+  { id: "beast-friend", name: "Друг зверей", rank: "Новичок", cost: null, range: "4 клетки", duration: "10 минут", detail: "Позволяет управлять обычными животными; не действует на чудовищных зверей.", manifestations: { witchcraft: "Дрессировка, лакомства с добавками и стимуляторы." } },
+  { id: "bolt", name: "Стрела", rank: "Новичок", cost: 1, range: "СМК ×2", duration: "Мгновенно", detail: "Дистанционная атака на 2d6 урона, 3d6 при подъёме.", manifestations: { witchcraft: "Воспламеняющиеся узелки; дистанция 3/6/12.", "weird-science": "Высокоточный многозарядный арбалет; используется Стрельба." } },
+  { id: "detect-conceal-arcana", name: "Увидеть / скрыть сверхъестественное", rank: "Новичок", cost: 2, range: "СМК", duration: "Особая", detail: "Позволяет замечать магию 5 раундов либо скрывает её на час.", manifestations: { witchcraft: "Шестое чувство и оккультный опыт, раскрывающие свойства реликвий." } },
+  { id: "mind-reading", name: "Чтение мыслей", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "После успешной проверки против Смекалки цели позволяет читать её мысли.", manifestations: { witchcraft: "Проницательность и талант гипнотизёра." } },
+  { id: "deflection", name: "Щит", rank: "Новичок", cost: 2, range: "СМК", duration: "5 раундов", detail: "−2 к атакам дальнего либо ближнего боя по цели; при подъёме — к обоим видам.", manifestations: { witchcraft: "Плащ фокусника, скрывающий настоящее положение носителя.", "weird-science": "Жилет из призматических линз." } },
+  { id: "disguise", name: "Маска", rank: "Закалённый", cost: 2, range: "СМК", duration: "10 минут", detail: "Придаёт цели чужой облик.", manifestations: { witchcraft: "Грим, наряд-хамелеон и актёрский талант." } },
+  { id: "dispel", name: "Рассеивание", rank: "Новичок", cost: 1, range: "СМК", duration: "Мгновенно", detail: "Отменяет действие мистической силы.", manifestations: { witchcraft: "Оккультные знания, отвлекающие жесты, кислоты и соли." } },
+  { id: "divination", name: "Прорицание", rank: "Закалённый", cost: 5, range: "На себя", duration: "5 минут", detail: "Позволяет задавать вопросы потусторонним сущностям.", manifestations: { witchcraft: "Астрология, гадание, хиромантия и толкование знамений." } },
+  { id: "environmental-protection", name: "Защита от окружающей среды", rank: "Новичок", cost: 2, range: "СМК", duration: "1 час", detail: "Защищает цель от опасной окружающей среды.", manifestations: { "weird-science": "Невероятный защитный костюм." } },
+  { id: "wall-walker", name: "Паучьи лапы", rank: "Новичок", cost: 2, range: "СМК", duration: "5 раундов", detail: "Позволяет ходить по стенам и потолку на половину Шага, при подъёме — на полный.", manifestations: { "weird-science": "Крюки, арбалеты-кошки или особый клей." } },
+  { id: "entangle", name: "Путы", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "Схватывает и обездвиживает противников.", manifestations: { "weird-science": "Цепи с защёлкивающимися звеньями." } },
+  { id: "smite", name: "Сокрушение", rank: "Новичок", cost: 2, range: "СМК", duration: "5 раундов", detail: "Увеличивает урон оружия цели на +2/+4.", manifestations: { "weird-science": "Механизированное оружие, зубчатые клинки или раскаляющиеся болты." } },
+  { id: "havoc", name: "Смерч", legacyName: "Волна", rank: "Новичок", cost: 2, range: "СМК", duration: "Мгновенно", detail: "Отвлекает и может отбросить цели в среднем или конусном шаблоне.", manifestations: { "weird-science": "Пневматическая пушка, выпускающая сильный порыв воздуха." } },
+  { id: "fly", name: "Полёт", rank: "Ветеран", cost: 3, range: "СМК", duration: "5 раундов", detail: "Позволяет цели летать с Шагом 12.", manifestations: { "weird-science": "Легендарная летающая машина." } },
+];
 
 const ARCHETYPES = [
   "Алхимик",
@@ -435,9 +539,9 @@ const EDGE_GUIDES: TraitGuide[] = [
   { name: "Профессионал++", requirements: "Легенда, дикая карта, Профессионал+ в выбранном параметре", detail: "При проверках выбранного параметра герой использует d10 как дикий кубик.", source: "SWADE" },
   { name: "Избранный", requirements: "Новичок, Характер d8+, Драка d6+", detail: "+2 к урону против сверхъестественных существ противоположной природы.", source: "SWADE" },
   { name: "Ци", requirements: "Ветеран, Мастер боевых искусств+", detail: "Раз за бой позволяет перебросить атаку, заставить врага перебросить удачную атаку или добавить d6 к безоружной Драке.", source: "SWADE" },
-  { name: "Мистический дар (алхимия)", requirements: "Новичок", detail: "Открывает алхимию и сверхъестественный навык Алхимия.", source: "Ultima Forsan" },
-  { name: "Мистический дар (ведьмовство)", requirements: "Новичок", detail: "Открывает ведьмовство и сверхъестественный навык Ведьмовство.", source: "Ultima Forsan" },
-  { name: "Мистический дар (безумная наука)", requirements: "Новичок", detail: "Открывает Безумную науку d4, 2 начальные силы и 15 ПС; силы проявляются через устройства.", source: "Ultima Forsan" },
+  { name: "Мистический дар (алхимия)", requirements: "Новичок", detail: "Открывает Алхимию и 3 начальные силы. В Ultima Forsan пункты силы не тратятся.", source: "Ultima Forsan" },
+  { name: "Мистический дар (ведьмовство)", requirements: "Новичок", detail: "Открывает Ведьмовство и 2 начальные силы. В Ultima Forsan пункты силы не тратятся.", source: "Ultima Forsan" },
+  { name: "Мистический дар (безумная наука)", requirements: "Новичок", detail: "Открывает Безумную науку d4 и 2 начальные силы; каждая сила проявляется через отдельное устройство, без запаса ПС.", source: "Ultima Forsan" },
   { name: "Аль-барсарк", requirements: "Новичок, обычно сицилийский норманн, Сила d8+, Характер d6+", detail: "Священная ярость против чумных отродий усиливает ближний бой и Стойкость, но снижает Защиту.", source: "Ultima Forsan" },
   { name: "Выстрел в голову", requirements: "Новичок, Стрельба d8+, Твёрдая рука", detail: "Вдвое уменьшает штраф за прицельный выстрел в голову мертвецу.", source: "Ultima Forsan" },
   { name: "Удар в голову", requirements: "Новичок, Сила d6+, Драка d8+, Хладнокровие", detail: "Вдвое уменьшает штраф за прицельный удар в голову мертвеца.", source: "Ultima Forsan" },
@@ -655,7 +759,7 @@ const BASE_SKILLS: Omit<Skill, "level">[] = [
   { id: "faith", name: "Вера", attribute: "spirit" },
   { id: "battle", name: "Военное дело", attribute: "smarts" },
   { id: "thievery", name: "Воровство", attribute: "agility" },
-  { id: "witchcraft", name: "Ведьмовство", attribute: "smarts" },
+  { id: "witchcraft", name: "Ведьмовство", attribute: "spirit" },
   { id: "survival", name: "Выживание", attribute: "smarts" },
   { id: "performance", name: "Выступление", attribute: "spirit" },
   { id: "fighting", name: "Драка", attribute: "agility" },
@@ -723,6 +827,7 @@ const createInitialCharacter = (): Character => ({
   languages: "",
   edges: [blankEdge()],
   hindrances: [blankHindrance(), blankHindrance(), blankHindrance()],
+  powers: [],
   weapons: [blankWeapon(), blankWeapon(), blankWeapon()],
   inventory: [],
   gear: "",
@@ -739,6 +844,7 @@ const createInitialCharacter = (): Character => ({
   fatigue: 0,
   shaken: false,
   infected: false,
+  witchcraftBacklash: false,
   sessionBennies: 3,
   plagueExposure: 0,
   ammoSpent: {},
@@ -783,6 +889,22 @@ function restoreCharacter(value?: Partial<Character>): Character {
     attributeRaiseRanks: Array.isArray(rest.attributeRaiseRanks) ? rest.attributeRaiseRanks : [],
     retiredHindrancePoints: Math.max(0, safeNumber(rest.retiredHindrancePoints)),
     inventory: restoredInventory,
+    powers: Array.isArray(rest.powers)
+      ? rest.powers
+          .filter((power) => power && ARCANE_TRADITION_ORDER.includes(power.tradition) && POWER_GUIDES.some((guide) => guide.id === power.guideId && guide.manifestations[power.tradition]))
+          .map((power) => {
+            const guide = POWER_GUIDES.find((item) => item.id === power.guideId)!;
+            return {
+              ...power,
+              id: power.id || `power-${makeId()}`,
+              name: guide.name,
+              trapping: typeof power.trapping === "string" ? power.trapping : guide.manifestations[power.tradition] || "",
+              prepared: Math.max(0, safeNumber(power.prepared)),
+              active: Boolean(power.active),
+              broken: Boolean(power.broken),
+            };
+          })
+      : [],
     portraitX: Math.min(100, Math.max(0, safeNumber(rest.portraitX, 50))),
     portraitY: Math.min(100, Math.max(0, safeNumber(rest.portraitY, 50))),
     portraitZoom: Math.min(180, Math.max(100, safeNumber(rest.portraitZoom, 100))),
@@ -837,6 +959,7 @@ function captureAdvanceState(character: Character, skills: Skill[]): AdvanceSnap
     attributes: character.attributes,
     edges: character.edges,
     hindrances: character.hindrances,
+    powers: character.powers,
     skills,
   });
 }
@@ -958,6 +1081,26 @@ function rankFromAdvances(value: unknown): Rank {
 
 function nextRankAt(rank: Rank) {
   return ({ Новичок: 4, Закалённый: 8, Ветеран: 12, Герой: 16, Легенда: null } as const)[rank];
+}
+
+function rankAllowsPower(rank: Rank, power: PowerGuide) {
+  return RANKS.indexOf(rank) >= RANKS.indexOf(power.rank);
+}
+
+function rollExplodingDie(sides: number) {
+  const rolls: number[] = [];
+  let total = 0;
+  let roll = 0;
+  do {
+    roll = Math.floor(Math.random() * sides) + 1;
+    rolls.push(roll);
+    total += roll;
+  } while (roll === sides);
+  return { rolls, total };
+}
+
+function formatDieRoll(rolls: number[]) {
+  return rolls.join("+");
 }
 
 function nextDie(value: Die): Die | null {
@@ -1282,6 +1425,59 @@ function WeaponGuideInput({ weapon, onChange }: { weapon: Weapon; onChange: (pat
   );
 }
 
+function PowerGuideInput({
+  tradition,
+  rank,
+  excludeGuideIds,
+  disabled,
+  onChoose,
+}: {
+  tradition: ArcaneTradition;
+  rank: Rank;
+  excludeGuideIds: string[];
+  disabled?: boolean;
+  onChoose: (guide: PowerGuide) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const normalized = query.trim().toLocaleLowerCase("ru");
+  const excluded = new Set(excludeGuideIds);
+  const suggestions = POWER_GUIDES
+    .filter((guide) => guide.manifestations[tradition] && !excluded.has(guide.id))
+    .filter((guide) => !normalized || `${guide.name} ${guide.legacyName || ""}`.toLocaleLowerCase("ru").includes(normalized))
+    .sort((left, right) => RANKS.indexOf(left.rank) - RANKS.indexOf(right.rank) || left.name.localeCompare(right.name, "ru"));
+
+  return (
+    <div className="guide-field power-guide-field">
+      <input
+        aria-label={`Добавить силу: ${ARCANE_TRADITIONS[tradition].label}`}
+        value={query}
+        disabled={disabled}
+        placeholder={disabled ? "Все доступные места заполнены" : "Найдите силу по названию"}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+      />
+      {open && suggestions.length > 0 && (
+        <div className="guide-menu power-guide-menu" role="listbox" aria-label="Силы Ultima Forsan, адаптированные к SWADE">
+          <div className="guide-menu-summary"><span>{normalized ? `Найдено: ${suggestions.length}` : `Для традиции: ${suggestions.length}`}</span><b>Ранг: {rank}</b></div>
+          {suggestions.map((guide) => {
+            const unavailable = !rankAllowsPower(rank, guide);
+            return (
+              <button className={unavailable ? "future-rank" : ""} disabled={unavailable} key={guide.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChoose(guide); setQuery(""); setOpen(false); }}>
+                <span><strong>{guide.name}</strong><em>{guide.rank}</em>{guide.legacyName && <i>ранее: {guide.legacyName}</i>}</span>
+                <small>{guide.cost === null ? "особая стоимость" : `${guide.cost} ПС → штраф −${Math.floor(guide.cost / 2)}`} · {guide.range} · {guide.duration}</small>
+                <p>{guide.detail}</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [character, setCharacter] = useState<Character>(() => createInitialCharacter());
   const [skills, setSkills] = useState<Skill[]>(() => createInitialSkills());
@@ -1298,6 +1494,8 @@ export default function Home() {
   const [advanceSecondary, setAdvanceSecondary] = useState("");
   const [advanceError, setAdvanceError] = useState("");
   const [portraitError, setPortraitError] = useState("");
+  const [powerCosts, setPowerCosts] = useState<Record<string, number>>({});
+  const [powerRolls, setPowerRolls] = useState<Record<string, PowerRollResult>>({});
   const hydrated = useRef(false);
   const portraitInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
@@ -1550,6 +1748,16 @@ export default function Home() {
   const advances = Math.max(0, safeNumber(character.advances));
   const currentRank = rankFromAdvances(advances);
   const nextRankThreshold = nextRankAt(currentRank);
+  const ownedEdgeNames = character.edges.map((edge) => edge.name.trim().toLocaleLowerCase("ru"));
+  const arcaneTraditions = ARCANE_TRADITION_ORDER.filter((tradition) =>
+    ownedEdgeNames.includes(ARCANE_TRADITIONS[tradition].edgeName.toLocaleLowerCase("ru")),
+  );
+  const displayedArcaneTraditions = ARCANE_TRADITION_ORDER.filter((tradition) =>
+    arcaneTraditions.includes(tradition) || character.powers.some((power) => power.tradition === tradition),
+  );
+  const bonusPowerSlots = character.edges.filter((edge) => edge.name.trim() === "Новые силы").length * 2;
+  const powerLimit = arcaneTraditions.reduce((total, tradition) => total + ARCANE_TRADITIONS[tradition].initialPowers, 0) + bonusPowerSlots;
+  const activeWitchcraftPowers = character.powers.filter((power) => power.tradition === "witchcraft" && power.active).length;
   const edgeAdvances = Math.min(advances, Math.max(0, safeNumber(character.edgeAdvances)));
   const baseEdgeSlots = 1;
   const edgeLimit = baseEdgeSlots + hindranceEdgeSlots + edgeAdvances;
@@ -1607,6 +1815,85 @@ export default function Home() {
     );
   };
 
+  const addPower = (tradition: ArcaneTradition, guide: PowerGuide) => {
+    if (!arcaneTraditions.includes(tradition) || character.powers.length >= powerLimit) return;
+    if (character.powers.some((power) => power.tradition === tradition && power.guideId === guide.id)) return;
+    update("powers", [...character.powers, {
+      id: `power-${makeId()}`,
+      guideId: guide.id,
+      tradition,
+      name: guide.name,
+      trapping: guide.manifestations[tradition] || "",
+      prepared: 0,
+      active: false,
+      broken: false,
+    }]);
+  };
+
+  const updatePower = (id: string, patch: Partial<KnownPower>) => {
+    setCharacter((current) => ({ ...current, powers: current.powers.map((power) => power.id === id ? { ...power, ...patch } : power) }));
+  };
+
+  const removePower = (id: string) => {
+    setCharacter((current) => ({ ...current, powers: current.powers.filter((power) => power.id !== id) }));
+    setPowerCosts((current) => { const next = { ...current }; delete next[id]; return next; });
+    setPowerRolls((current) => { const next = { ...current }; delete next[id]; return next; });
+  };
+
+  const activatePower = (power: KnownPower) => {
+    const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
+    const tradition = ARCANE_TRADITIONS[power.tradition];
+    const skill = skills.find((item) => item.id === tradition.skillId);
+    if (!guide || power.broken || (power.tradition === "alchemy" && power.prepared <= 0)) return;
+
+    const selectedCost = Math.max(guide.cost || 0, Math.floor(powerCosts[power.id] ?? guide.cost ?? 0));
+    const maintainedPenalty = power.tradition === "witchcraft"
+      ? Math.max(0, activeWitchcraftPowers - (power.active ? 1 : 0))
+      : 0;
+    const modifier = power.tradition === "alchemy" ? 0 : -Math.floor(selectedCost / 2) - maintainedPenalty;
+    const listedDie = skill?.level || 0;
+    const strainedIndex = Math.max(1, DIE_OPTIONS.indexOf(listedDie) - (power.tradition === "witchcraft" && character.witchcraftBacklash ? 1 : 0));
+    const rolledDie = listedDie === 0 ? 4 : DIE_OPTIONS[strainedIndex];
+    const untrainedPenalty = listedDie === 0 ? -2 : 0;
+    const traitRoll = rollExplodingDie(rolledDie);
+    const wildRoll = rollExplodingDie(6);
+    const backlash = traitRoll.rolls[0] === 1;
+    const total = Math.max(traitRoll.total, wildRoll.total) + modifier + untrainedPenalty;
+    const success = total >= 4 && !backlash;
+    const raises = success ? Math.max(0, Math.floor((total - 4) / 4)) : 0;
+    let outcome = success ? (raises ? `Подъём ×${raises}` : "Успех") : "Провал";
+    if (backlash && power.tradition === "alchemy") outcome = "Субстанция не сработала";
+    if (backlash && power.tradition === "witchcraft") outcome = "Отдача: шок и Ведьмовство −1 ступень";
+    if (backlash && power.tradition === "weird-science") outcome = "Отдача: устройство сломано, 2d6 урона";
+
+    setPowerRolls((current) => ({
+      ...current,
+      [power.id]: {
+        trait: formatDieRoll(traitRoll.rolls),
+        wild: formatDieRoll(wildRoll.rolls),
+        total,
+        modifier: modifier + untrainedPenalty,
+        outcome,
+        backlash,
+      },
+    }));
+    setCharacter((current) => ({
+      ...current,
+      shaken: power.tradition !== "alchemy" && !success ? true : current.shaken,
+      witchcraftBacklash: power.tradition === "witchcraft" ? (success ? false : backlash || current.witchcraftBacklash) : current.witchcraftBacklash,
+      powers: current.powers.map((entry) => {
+        if (entry.id === power.id) return {
+          ...entry,
+          prepared: power.tradition === "alchemy" ? Math.max(0, entry.prepared - 1) : entry.prepared,
+          broken: power.tradition === "weird-science" && backlash ? true : entry.broken,
+          active: success && guide.duration !== "Мгновенно" && guide.duration !== "Особая" ? true : entry.active,
+        };
+        if (power.tradition !== "alchemy" && !success) return { ...entry, active: false };
+        return entry;
+      }),
+    }));
+  };
+
   const openAdvance = () => {
     setAdvanceType("edge");
     setAdvancePrimary("");
@@ -1638,7 +1925,7 @@ export default function Home() {
       if (!guide) return setAdvanceError("Выберите черту.");
       const issues = edgeRequirementIssues(guide, newRank, character, skills);
       if (issues.length) return setAdvanceError(`Не выполнены требования: ${issues.join("; ")}.`);
-      if (character.edges.some((item) => item.name === guide.name)) return setAdvanceError("Эта черта уже записана у героя.");
+      if (guide.name !== "Новые силы" && character.edges.some((item) => item.name === guide.name)) return setAdvanceError("Эта черта уже записана у героя.");
       setCharacter((current) => ({
         ...current,
         advances: String(newAdvanceCount),
@@ -2000,6 +2287,40 @@ export default function Home() {
                 <div className="play-toggles"><label><input type="checkbox" checked={character.shaken} onChange={(event) => update("shaken", event.target.checked)} /> В шоке</label><label><input type="checkbox" checked={character.infected} onChange={(event) => update("infected", event.target.checked)} /> Заражён Чумой</label></div>
               </section>
 
+              {(displayedArcaneTraditions.length > 0 || character.powers.length > 0) && (
+                <section className="play-card play-magic">
+                  <div className="play-card-title"><span>Мистика и силы</span><small>Правило мира: без пунктов силы</small></div>
+                  {character.witchcraftBacklash && <label className="magic-strain"><input type="checkbox" checked={character.witchcraftBacklash} onChange={(event) => update("witchcraftBacklash", event.target.checked)} /> Ведьмовство временно снижено на ступень</label>}
+                  {character.powers.length ? <div className="play-power-list">{character.powers.map((power) => {
+                    const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
+                    if (!guide) return null;
+                    const tradition = ARCANE_TRADITIONS[power.tradition];
+                    const skill = skills.find((item) => item.id === tradition.skillId);
+                    const currentCost = Math.max(guide.cost || 0, powerCosts[power.id] ?? guide.cost ?? 0);
+                    const maintainedPenalty = power.tradition === "witchcraft" ? Math.max(0, activeWitchcraftPowers - (power.active ? 1 : 0)) : 0;
+                    const activationPenalty = power.tradition === "alchemy" ? 0 : -Math.floor(currentCost / 2) - maintainedPenalty;
+                    const result = powerRolls[power.id];
+                    return (
+                      <article className={`play-power ${power.active ? "is-active" : ""} ${power.broken ? "is-broken" : ""}`} key={power.id}>
+                        <header><div><small>{tradition.label} · {guide.rank}</small><b>{power.name}</b></div><strong>{activationPenalty ? `${activationPenalty}` : "±0"}</strong></header>
+                        <p>{power.trapping}</p>
+                        <div className="play-power-meta"><span>{guide.range}</span><span>{guide.duration}</span><span>{guide.detail}</span></div>
+                        <div className="play-power-controls">
+                          <label><span>{power.tradition === "alchemy" ? "Цена смеси" : "Стоимость сейчас"}</span><input type="number" min={guide.cost || 0} value={currentCost} onChange={(event) => setPowerCosts((current) => ({ ...current, [power.id]: Math.max(guide.cost || 0, safeNumber(event.target.value)) }))} /></label>
+                          {power.tradition === "alchemy" && <label><span>Готовых доз</span><input type="number" min="0" value={power.prepared} onChange={(event) => updatePower(power.id, { prepared: Math.max(0, safeNumber(event.target.value)) })} /></label>}
+                          <button type="button" disabled={power.broken || (power.tradition === "alchemy" && power.prepared <= 0)} onClick={() => activatePower(power)}>Бросить {skill?.name || tradition.label} {dieLabel(skill?.level || 0)}</button>
+                        </div>
+                        <div className="play-power-status">
+                          <label><input type="checkbox" checked={power.active} onChange={(event) => updatePower(power.id, { active: event.target.checked })} /> {power.tradition === "alchemy" ? "Эффект действует" : "Поддерживается"}</label>
+                          {power.tradition === "weird-science" && <label><input type="checkbox" checked={power.broken} onChange={(event) => updatePower(power.id, { broken: event.target.checked })} /> Устройство сломано</label>}
+                        </div>
+                        {result && <div className={`power-roll-result ${result.backlash ? "is-backlash" : ""}`}><b>{result.outcome}</b><span>Навык: {result.trait} · дикий: {result.wild} · модификатор {result.modifier >= 0 ? "+" : ""}{result.modifier} · итог {result.total}</span></div>}
+                      </article>
+                    );
+                  })}</div> : <p className="play-empty">Силы ещё не выбраны. Откройте досье, чтобы добавить их из справочника.</p>}
+                </section>
+              )}
+
               <section className="play-card">
                 <div className="play-card-title"><span>Черты и изъяны</span></div>
                 <div className="play-traits-grid">
@@ -2355,7 +2676,47 @@ export default function Home() {
           </details>
 
           <details open>
-            <summary><span>06</span> Состояние в игре</summary>
+            <summary><span>06</span> Мистика и силы</summary>
+            <div className="section-body magic-editor">
+              <div className="magic-rules-intro"><b>Ultima Forsan играет без пунктов силы.</b><span>Стоимость из SWADE нужна для штрафа к активации и алхимических ингредиентов, но запас ПС вести не нужно. Старые названия и ранги ниже уже адаптированы к SWADE.</span></div>
+              {arcaneTraditions.length === 0 ? (
+                <p className="magic-empty">Добавьте в разделе «Черты и изъяны» один из мистических даров: алхимию, ведьмовство или безумную науку. После этого здесь появится подходящий справочник сил.</p>
+              ) : (
+                <>
+                  <div className="magic-capacity"><span>Известные силы</span><strong>{character.powers.length} / {powerLimit}</strong><small>{bonusPowerSlots ? `В том числе +${bonusPowerSlots} за черту «Новые силы».` : "Начальный предел задаётся мистическим даром; черта «Новые силы» добавляет ещё две."}</small></div>
+                  {arcaneTraditions.map((traditionId) => {
+                    const tradition = ARCANE_TRADITIONS[traditionId];
+                    const arcaneSkill = skills.find((skill) => skill.id === tradition.skillId);
+                    const traditionPowers = character.powers.filter((power) => power.tradition === traditionId);
+                    return (
+                      <section className="magic-tradition" key={traditionId}>
+                        <header><div><span>Мистический дар</span><h3>{tradition.label}</h3></div><strong>{arcaneSkill?.name || tradition.label} {dieLabel(arcaneSkill?.level || 0)}</strong></header>
+                        <p>{tradition.rules}</p>
+                        {(!arcaneSkill || arcaneSkill.level === 0) && <small className="magic-skill-warning">Навык не изучен: проверки будут выполняться как d4−2.</small>}
+                        <PowerGuideInput tradition={traditionId} rank={currentRank} excludeGuideIds={traditionPowers.map((power) => power.guideId)} disabled={character.powers.length >= powerLimit} onChoose={(guide) => addPower(traditionId, guide)} />
+                      </section>
+                    );
+                  })}
+                </>
+              )}
+              {character.powers.length > 0 && <div className="known-power-list">{character.powers.map((power) => {
+                const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
+                if (!guide) return null;
+                return (
+                  <article key={power.id}>
+                    <header><div><small>{ARCANE_TRADITIONS[power.tradition].label} · {guide.rank}{guide.legacyName ? ` · ранее «${guide.legacyName}»` : ""}</small><b>{power.name}</b></div><button className="remove" type="button" aria-label={`Удалить силу ${power.name}`} onClick={() => removePower(power.id)}>×</button></header>
+                    <div className="power-rules-line"><span>{guide.cost === null ? "ПС: особ." : `ПС: ${guide.cost}`}</span><span>{guide.range}</span><span>{guide.duration}</span></div>
+                    <p>{guide.detail}</p>
+                    <label><span>Проявление силы</span><textarea value={power.trapping} maxLength={240} onChange={(event) => updatePower(power.id, { trapping: event.target.value })} /></label>
+                    {power.tradition === "alchemy" && <label className="prepared-editor"><span>Готовых доз сейчас</span><input type="number" min="0" value={power.prepared} onChange={(event) => updatePower(power.id, { prepared: Math.max(0, safeNumber(event.target.value)) })} /></label>}
+                  </article>
+                );
+              })}</div>}
+            </div>
+          </details>
+
+          <details open>
+            <summary><span>07</span> Состояние в игре</summary>
             <div className="section-body session-state">
               <p>Временные отметки сохраняются с героем, но не изменяют постоянные параметры.</p>
               <div className="state-grid">
@@ -2370,7 +2731,7 @@ export default function Home() {
           </details>
 
           <details>
-            <summary><span>07</span> Настройки PDF</summary>
+            <summary><span>08</span> Настройки PDF</summary>
             <div className="section-body print-settings">
               <label><input type="checkbox" checked={character.printPortrait} onChange={(event) => update("printPortrait", event.target.checked)} /> Печатать портрет</label>
               <label><input type="checkbox" checked={character.printDiceValues} onChange={(event) => update("printDiceValues", event.target.checked)} /> Показывать цифры внутри контуров дайсов</label>
@@ -2380,7 +2741,7 @@ export default function Home() {
           </details>
 
           <details open>
-            <summary><span>08</span> Человек под маской</summary>
+            <summary><span>09</span> Человек под маской</summary>
             <div className="section-body">
               <div className="field-grid two narrative-grid">
                 <TextAreaField label="Родина и прошлое" value={character.homeland} onChange={(value) => update("homeland", value)} placeholder="Откуда вы и что оставили позади?" />
@@ -2502,7 +2863,7 @@ export default function Home() {
               <footer className="sheet-footer"><span>Кости и Чернила</span><b>Θ</b><span>Лист I / {character.printExtraNotesPage ? "III" : "II"}</span></footer>
             </article>
 
-            <article className="character-sheet sheet-two">
+            <article className={`character-sheet sheet-two ${character.powers.length ? "has-powers" : ""}`}>
               <div className="sheet-crop top-left" /><div className="sheet-crop top-right" />
               <header className="sheet-header compact">
                 <div className="folio">II</div>
@@ -2540,13 +2901,25 @@ export default function Home() {
                 <p>{[...character.inventory.map((item) => `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ""}`), character.gear].filter(Boolean).join("; ") || "-"}</p>
               </section>
 
+              {character.powers.length > 0 && (
+                <section className="sheet-section magic-print">
+                  <h3><span>X</span> Мистика и силы <small>без пунктов силы</small></h3>
+                  <div>{character.powers.slice(0, 8).map((power) => {
+                    const guide = POWER_GUIDES.find((item) => item.id === power.guideId);
+                    if (!guide) return null;
+                    const penalty = power.tradition === "alchemy" || guide.cost === null ? "±0" : `−${Math.floor(guide.cost / 2)}`;
+                    return <article key={power.id}><b>{power.name}</b><small>{ARCANE_TRADITIONS[power.tradition].label} · {guide.cost === null ? "особ." : `${guide.cost} ПС`} · проверка {penalty} · {guide.range} · {guide.duration}</small><p>{power.trapping}</p></article>;
+                  })}</div>
+                </section>
+              )}
+
               <section className="appearance-print second-page-appearance">
-                <h3><span>X</span> Описание и приметы</h3>
+                <h3><span>{character.powers.length ? "XI" : "X"}</span> Описание и приметы</h3>
                 <div><p>{character.appearance || "Место для примет и слов очевидцев."}</p></div>
               </section>
 
               <section className="sheet-section biography-print">
-                <h3><span>XI</span> Человек под маской</h3>
+                <h3><span>{character.powers.length ? "XII" : "XI"}</span> Человек под маской</h3>
                 <div>
                   <article><small>Родина и прошлое</small><p>{character.homeland || "-"}</p></article>
                   <article><small>Вера или убеждение</small><p>{character.belief || "-"}</p></article>
@@ -2603,7 +2976,7 @@ export default function Home() {
                     kind="edge"
                     entry={{ id: "advance-edge", name: advancePrimary, note: "" }}
                     rank={rankFromAdvances(advances + 1)}
-                    excludeNames={character.edges.map((edge) => edge.name)}
+                    excludeNames={character.edges.filter((edge) => edge.name !== "Новые силы").map((edge) => edge.name)}
                     disableFutureRank
                     requirementIssues={(guide) => edgeRequirementIssues(guide, rankFromAdvances(advances + 1), character, skills)}
                     onChange={(patch) => {

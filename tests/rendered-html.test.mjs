@@ -47,6 +47,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /Черта выдаётся только после заражения в игре/);
   assert.match(page, /Черта недоступна в кампании Ultima Forsan/);
   assert.match(page, /id: "weird-science", name: "Безумная наука"/);
+  assert.match(page, /id: "witchcraft", name: "Ведьмовство", attribute: "spirit"/);
   assert.match(page, /name: "Мистический дар \(безумная наука\)"/);
   assert.match(page, /Искариот"[\s\S]*Скрытность d8\+/);
   assert.doesNotMatch(page, /Маскировка d8\+", detail/);
@@ -69,7 +70,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /function TraitGuideInput/);
   assert.match(page, /disableFutureRank/);
   assert.match(page, /className="advance-edge-picker"/);
-  assert.match(page, /excludeNames=\{character\.edges\.map/);
+  assert.match(page, /excludeNames=\{character\.edges\.filter/);
   assert.match(page, /function AttributeDie/);
   assert.match(page, /const ATTRIBUTE_DICE: Die\[\] = \[4, 6, 8, 10, 12\]/);
   assert.match(page, /className="blood-stat"/);
@@ -151,6 +152,19 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /Состояние в игре/);
   assert.match(page, /Потраченный боезапас/);
   assert.match(page, /Настройки PDF/);
+  assert.match(page, /type ArcaneTradition = "alchemy" \| "witchcraft" \| "weird-science"/);
+  assert.match(page, /const ARCANE_TRADITIONS/);
+  assert.match(page, /const POWER_GUIDES: PowerGuide\[\]/);
+  assert.match(page, /Правило мира: без пунктов силы/);
+  assert.match(page, /function rollExplodingDie/);
+  assert.match(page, /const activatePower/);
+  assert.match(page, /Готовых доз/);
+  assert.match(page, /Устройство сломано/);
+  assert.match(page, /witchcraftBacklash/);
+  assert.match(page, /legacyName: "Ночное зрение"/);
+  assert.match(page, /legacyName: "Кукла"/);
+  assert.match(page, /legacyName: "Волна"/);
+  assert.match(page, /className="sheet-section magic-print"/);
   assert.match(page, /printExtraNotesPage/);
   assert.match(page, /portraitZoom/);
   assert.match(page, /const WEAPON_PURCHASE_DATA/);
@@ -188,6 +202,9 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(css, /\.creation-lock/);
   assert.match(css, /\.play-dashboard/);
   assert.match(css, /\.play-skills-grid/);
+  assert.match(css, /\.play-power-list/);
+  assert.match(css, /\.magic-rules-intro/);
+  assert.match(css, /\.magic-print/);
   assert.match(page, /hydra-logo-full-black\.svg/);
   assert.match(css, /\.site-logo img/);
   assert.match(page, /function PlayNumberStepper/);
