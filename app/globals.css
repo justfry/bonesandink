@@ -539,13 +539,15 @@ details[open] summary::after { content: "−"; }
 .weapon-purchase { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: 3px 24px 0 0; color: #796c62; font-size: 8px; }
 .weapon-purchase button { padding: 4px 6px; color: #84252a; background: transparent; border: 1px solid #b9a295; font-size: 8px; font-weight: 800; }
 .weapon-purchase button:disabled { opacity: .3; cursor: not-allowed; }
-.equipment-summary { display: grid; grid-template-columns: .7fr 1.4fr 1fr; gap: 8px; margin: 18px 0 12px; }
+.equipment-summary { display: grid; grid-template-columns: .65fr 1.1fr 1.55fr 1.1fr; gap: 8px; margin: 18px 0 12px; }
 .equipment-summary > div { min-height: 64px; padding: 9px 10px; background: #e9e0d4; border: 1px solid #cec0b2; }
 .equipment-summary span, .equipment-summary small, .equipment-summary strong { display: block; }
 .equipment-summary span { color: #7b6e65; font-size: 8px; font-weight: 800; text-transform: uppercase; }
 .equipment-summary strong { margin-top: 5px; font: 700 13px/1.15 var(--serif); }
 .equipment-summary small { margin-top: 4px; color: #786d64; font-size: 7px; }
 .equipment-store h3, .inventory-list h3, .ammo-tracker h3 { margin: 0 0 8px; color: #652025; font: 700 14px/1.2 var(--serif); }
+.equipment-rules-note { margin: 0 0 10px; padding: 9px 11px; color: #655b53; background: #ece4d8; border-left: 3px solid #85262b; font-size: 8px; line-height: 1.45; }
+.equipment-rules-note b { color: #762126; }
 .equipment-catalog { max-height: 330px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; overflow: auto; padding-right: 4px; }
 .equipment-catalog article { position: relative; min-height: 112px; padding: 10px 12px 44px; background: #f5eee4; border: 1px solid #d0c2b4; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease; }
 .equipment-catalog article > span { color: #8a292e; font-size: 7px; font-weight: 900; text-transform: uppercase; }

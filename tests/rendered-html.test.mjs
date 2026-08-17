@@ -129,6 +129,13 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /const importHero/);
   assert.match(page, /ultima-forsan-hero/);
   assert.match(page, /const EQUIPMENT_GUIDES: EquipmentGuide\[\]/);
+  assert.match(page, /type ArmorArea = "head" \| "torso" \| "arms" \| "legs"/);
+  assert.match(page, /areas: \["head", "torso", "arms", "legs"\]/);
+  assert.match(page, /const effectiveArmor = Math\.max\(torsoArmor, manualTorsoArmor\)/);
+  assert.match(page, /Броня по зонам/);
+  assert.match(page, /Как считается броня/);
+  assert.match(page, /Броня торса вручную/);
+  assert.match(page, /rangedArmor: 2/);
   assert.match(page, /const purchaseEquipment/);
   assert.match(page, /Нагрузка/);
   assert.match(page, /function edgeRequirementIssues/);
@@ -176,6 +183,7 @@ test("character generator contains the printable flow and SWADE safeguards", asy
   assert.match(page, /equipment-card-select/);
   assert.match(page, /equipment-quantity/);
   assert.match(css, /\.equipment-card\.is-selected/);
+  assert.match(css, /\.equipment-rules-note/);
   assert.match(css, /\.equipment-card-select:focus-visible/);
   assert.match(css, /\.creation-lock/);
   assert.match(css, /\.play-dashboard/);

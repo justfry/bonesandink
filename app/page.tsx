@@ -50,6 +50,8 @@ type WeaponGuide = Omit<Weapon, "id"> & {
   detail: string;
 };
 
+type ArmorArea = "head" | "torso" | "arms" | "legs";
+
 type EquipmentGuide = {
   id: string;
   name: string;
@@ -58,6 +60,9 @@ type EquipmentGuide = {
   weight: number;
   armor?: number;
   parry?: number;
+  areas?: ArmorArea[];
+  headCoverage?: 50 | 100;
+  rangedArmor?: number;
   detail: string;
 };
 
@@ -255,21 +260,21 @@ const WEAPON_GUIDES: WeaponGuide[] = [
 ];
 
 const EQUIPMENT_GUIDES: EquipmentGuide[] = [
-  { id: "leather-arms", name: "Кожаные наручи", category: "Доспех", armor: 1, price: 10, weight: 2, detail: "Закрывают руки." },
-  { id: "leather-torso", name: "Кожаный панцирь", category: "Доспех", armor: 1, price: 20, weight: 3, detail: "Закрывает торс." },
-  { id: "leather-legs", name: "Кожаные поножи", category: "Доспех", armor: 1, price: 20, weight: 3, detail: "Закрывают ноги." },
-  { id: "catcher-suit", name: "Костюм ловца мертвецов", category: "Доспех", armor: 1, price: 60, weight: 8, detail: "Торс, руки и ноги; 50% защиты головы." },
-  { id: "chain-arms", name: "Кольчужные рукава", category: "Доспех", armor: 2, price: 80, weight: 3, detail: "Закрывают руки." },
-  { id: "chain-torso", name: "Кольчуга", category: "Доспех", armor: 2, price: 100, weight: 4, detail: "Закрывает торс." },
-  { id: "chain-legs", name: "Кольчужные шоссы", category: "Доспех", armor: 2, price: 120, weight: 5, detail: "Закрывают ноги." },
-  { id: "plate-arms", name: "Латные наручи", category: "Доспех", armor: 3, price: 200, weight: 5, detail: "Закрывают руки." },
-  { id: "plate-torso", name: "Латная кираса", category: "Доспех", armor: 3, price: 400, weight: 12.5, detail: "Закрывает торс." },
-  { id: "plate-legs", name: "Латные поножи", category: "Доспех", armor: 3, price: 300, weight: 7.5, detail: "Закрывают ноги." },
-  { id: "open-helmet", name: "Открытый шлем", category: "Доспех", armor: 3, price: 75, weight: 2, detail: "50% защиты головы." },
-  { id: "closed-helmet", name: "Закрытый шлем", category: "Доспех", armor: 3, price: 150, weight: 4, detail: "Закрывает голову." },
+  { id: "leather-arms", name: "Кожаные наручи", category: "Доспех", armor: 1, areas: ["arms"], price: 10, weight: 2, detail: "Закрывают руки." },
+  { id: "leather-torso", name: "Кожаный панцирь", category: "Доспех", armor: 1, areas: ["torso"], price: 20, weight: 3, detail: "Закрывает торс." },
+  { id: "leather-legs", name: "Кожаные поножи", category: "Доспех", armor: 1, areas: ["legs"], price: 20, weight: 3, detail: "Закрывают ноги." },
+  { id: "catcher-suit", name: "Костюм ловца мертвецов", category: "Доспех", armor: 1, areas: ["head", "torso", "arms", "legs"], headCoverage: 50, price: 60, weight: 8, detail: "Торс, руки и ноги; 50% защиты головы." },
+  { id: "chain-arms", name: "Кольчужные рукава", category: "Доспех", armor: 2, areas: ["arms"], price: 80, weight: 3, detail: "Закрывают руки." },
+  { id: "chain-torso", name: "Кольчуга", category: "Доспех", armor: 2, areas: ["torso"], price: 100, weight: 4, detail: "Закрывает торс." },
+  { id: "chain-legs", name: "Кольчужные шоссы", category: "Доспех", armor: 2, areas: ["legs"], price: 120, weight: 5, detail: "Закрывают ноги." },
+  { id: "plate-arms", name: "Латные наручи", category: "Доспех", armor: 3, areas: ["arms"], price: 200, weight: 5, detail: "Закрывают руки." },
+  { id: "plate-torso", name: "Латная кираса", category: "Доспех", armor: 3, areas: ["torso"], price: 400, weight: 12.5, detail: "Закрывает торс." },
+  { id: "plate-legs", name: "Латные поножи", category: "Доспех", armor: 3, areas: ["legs"], price: 300, weight: 7.5, detail: "Закрывают ноги." },
+  { id: "open-helmet", name: "Открытый шлем", category: "Доспех", armor: 3, areas: ["head"], headCoverage: 50, price: 75, weight: 2, detail: "50% защиты головы." },
+  { id: "closed-helmet", name: "Закрытый шлем", category: "Доспех", armor: 3, areas: ["head"], headCoverage: 100, price: 150, weight: 4, detail: "Закрывает голову." },
   { id: "buckler", name: "Малый щит (баклер)", category: "Щит", parry: 1, price: 25, weight: 4, detail: "Защита +1 от фронтальных атак и атак слева." },
-  { id: "medium-shield", name: "Средний щит", category: "Щит", parry: 1, price: 50, weight: 6, detail: "Защита +1; броня +2 против дистанционных атак." },
-  { id: "large-shield", name: "Большой щит (ростовой)", category: "Щит", parry: 2, price: 200, weight: 10, detail: "Защита +2; броня +2 против дистанционных атак." },
+  { id: "medium-shield", name: "Средний щит", category: "Щит", parry: 1, rangedArmor: 2, price: 50, weight: 6, detail: "Защита +1; броня +2 против дистанционных атак." },
+  { id: "large-shield", name: "Большой щит (ростовой)", category: "Щит", parry: 2, rangedArmor: 2, price: 200, weight: 10, detail: "Защита +2; броня +2 против дистанционных атак." },
   { id: "plague-mask", name: "Маска чумного доктора", category: "Инструмент", price: 10, weight: 0, detail: "+1 к Выносливости против миазм; −1 к Убеждению и Выступлению, когда внешний вид имеет значение." },
   { id: "alchemist-bag", name: "Сумка алхимика", category: "Инструмент", price: 300, weight: 3, detail: "Инструменты для изготовления алхимических препаратов." },
   { id: "witch-bag", name: "Сумка ведьмы", category: "Инструмент", price: 150, weight: 2, detail: "Компоненты и предметы для ведьмовских фокусов." },
@@ -763,6 +768,12 @@ function restoreCharacter(value?: Partial<Character>): Character {
     );
     return guide && guide.severity !== "either" ? { ...entry, severity: guide.severity } : entry;
   });
+  const restoredInventory = Array.isArray(rest.inventory)
+    ? rest.inventory.map((item) => {
+        const guide = EQUIPMENT_GUIDES.find((entry) => entry.id === item.id);
+        return guide ? { ...item, ...guide } : item;
+      })
+    : [];
   return {
     ...initial,
     ...rest,
@@ -771,7 +782,7 @@ function restoreCharacter(value?: Partial<Character>): Character {
     attributeAdvancePoints: Math.max(0, safeNumber(rest.attributeAdvancePoints)),
     attributeRaiseRanks: Array.isArray(rest.attributeRaiseRanks) ? rest.attributeRaiseRanks : [],
     retiredHindrancePoints: Math.max(0, safeNumber(rest.retiredHindrancePoints)),
-    inventory: Array.isArray(rest.inventory) ? rest.inventory : [],
+    inventory: restoredInventory,
     portraitX: Math.min(100, Math.max(0, safeNumber(rest.portraitX, 50))),
     portraitY: Math.min(100, Math.max(0, safeNumber(rest.portraitY, 50))),
     portraitZoom: Math.min(180, Math.max(100, safeNumber(rest.portraitZoom, 100))),
@@ -1546,9 +1557,22 @@ export default function Home() {
   const addableEdgeRows = Math.max(0, edgeLimit - character.edges.length);
   const fighting = skills.find((skill) => skill.id === "fighting")?.level ?? 0;
   const equippedArmor = character.inventory.filter((item) => item.equipped && item.category === "Доспех");
-  const equippedShield = character.inventory.filter((item) => item.equipped && item.category === "Щит").sort((a, b) => (b.parry || 0) - (a.parry || 0))[0];
-  const torsoArmor = Math.max(0, ...equippedArmor.filter((item) => item.detail.toLocaleLowerCase("ru").includes("торс")).map((item) => item.armor || 0));
-  const effectiveArmor = torsoArmor || safeNumber(character.armor);
+  const equippedShield = character.inventory
+    .filter((item) => item.equipped && item.category === "Щит")
+    .sort((a, b) => (b.parry || 0) - (a.parry || 0) || (b.rangedArmor || 0) - (a.rangedArmor || 0))[0];
+  const armorAt = (area: ArmorArea) => Math.max(
+    0,
+    ...equippedArmor.filter((item) => item.areas?.includes(area)).map((item) => item.armor || 0),
+  );
+  const headArmor = armorAt("head");
+  const torsoArmor = armorAt("torso");
+  const armsArmor = armorAt("arms");
+  const legsArmor = armorAt("legs");
+  const headCoverage = headArmor
+    ? Math.max(0, ...equippedArmor.filter((item) => item.areas?.includes("head") && (item.armor || 0) === headArmor).map((item) => item.headCoverage || 100))
+    : 0;
+  const manualTorsoArmor = Math.max(0, safeNumber(character.armor));
+  const effectiveArmor = Math.max(torsoArmor, manualTorsoArmor);
   const parry = (fighting === 0 ? 2 : 2 + halfDie(fighting)) + (equippedShield?.parry || 0);
   const toughness =
     2 + halfDie(character.attributes.vigor) + effectiveArmor + safeNumber(character.size);
@@ -1955,7 +1979,7 @@ export default function Home() {
                 <div className="play-card-title"><span>Главное</span><small>{advances} повышений</small></div>
                 <div className="play-derived-grid">
                   <div><span>Защита</span><strong>{parry}</strong></div>
-                  <div><span>Стойкость</span><strong>{toughness}</strong><small>броня {effectiveArmor}</small></div>
+                  <div><span>Стойкость</span><strong>{toughness}</strong><small>броня торса {effectiveArmor}</small></div>
                   <div><span>Шаг</span><strong>{encumbered ? Math.max(0, character.pace - 2) : character.pace}</strong>{encumbered && <small>перегрузка</small>}</div>
                   <div><span>Бег</span><strong>{dieLabel(character.runningDie)}</strong></div>
                   <div><span>Фишки</span><strong>{character.sessionBennies}</strong><small>из {character.bennies}</small></div>
@@ -2130,7 +2154,7 @@ export default function Home() {
               <div className="derived-grid">
                 <div><span>Защита</span><strong>{parry}</strong><small>2 + 1/2 Драки</small></div>
                 <div><span>Стойкость</span><strong>{toughness}</strong><small>с бронёй</small></div>
-                <label><span>Броня</span><input type="number" value={character.armor} onChange={(event) => update("armor", safeNumber(event.target.value))} /></label>
+                <label title="Запасное значение для нестандартной брони. С выбранным доспехом не складывается — используется большее."><span>Броня торса вручную</span><input type="number" min="0" value={character.armor} onChange={(event) => update("armor", Math.max(0, safeNumber(event.target.value)))} /></label>
                 <label><span>Размер</span><input type="number" value={character.size} onChange={(event) => update("size", safeNumber(event.target.value))} /></label>
                 <label><span>Шаг</span><input type="number" value={character.pace} onChange={(event) => update("pace", safeNumber(event.target.value, 6))} /></label>
                 <div className="derived-control"><span>Бег</span><DieSelect label="Кость бега" value={character.runningDie} allowUntrained={false} onChange={(value) => update("runningDie", value)} /></div>
@@ -2284,10 +2308,20 @@ export default function Home() {
               <div className="equipment-summary">
                 <div><span>Флорины</span><strong>{character.florins || 0}</strong></div>
                 <div className={encumbered ? "bad" : ""}><span>Нагрузка</span><strong>{inventoryWeight.toLocaleString("ru-RU")} / {loadLimit} кг</strong><small>{encumbered ? "Перегрузка: -2 к Шагу, бегу и Ловкости" : "Комфортная нагрузка"}</small></div>
-                <div><span>Экипировано</span><strong>Броня {effectiveArmor} · Защита +{equippedShield?.parry || 0}</strong></div>
+                <div className="armor-zone-summary">
+                  <span>Броня по зонам</span>
+                  <strong>Торс +{effectiveArmor} · Голова +{headArmor}{headCoverage === 50 ? " (50%)" : ""}</strong>
+                  <small>Руки +{armsArmor} · Ноги +{legsArmor}. В Стойкость входит броня торса.</small>
+                </div>
+                <div>
+                  <span>Щит</span>
+                  <strong>Защита +{equippedShield?.parry || 0}</strong>
+                  <small>{equippedShield?.rangedArmor ? `Броня +${equippedShield.rangedArmor} только против дистанционных атак спереди и слева.` : equippedShield ? "Работает против атак спереди и слева." : "Щит не экипирован."}</small>
+                </div>
               </div>
               <div className="equipment-store">
                 <h3>Броня, щиты и припасы</h3>
+                <p className="equipment-rules-note"><b>Как считается броня.</b> Каждый элемент защищает указанную зону. Бонусы разных зон и несколько доспехов на одной зоне не складываются: действует лучший. Обычная атака попадает в торс, поэтому именно его броня входит в Стойкость.</p>
                 <div className="equipment-catalog">
                   {EQUIPMENT_GUIDES.map((guide) => {
                     const selectedItem = character.inventory.find((item) => item.id === guide.id);
